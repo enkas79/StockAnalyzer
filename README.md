@@ -32,6 +32,20 @@ for leg in result.legs:
     print(leg.name, leg.state, leg.detail)
 ```
 
+## GUI (Qt6 / PySide6)
+
+```bash
+pip install -e .
+python run_gui.py
+# oppure, dopo l'installazione: stockanalyzer-gui
+```
+
+Inserisci un ticker, scegli periodo/intervallo e premi "Analizza": la GUI
+mostra direzione, punteggio di confidenza, il dettaglio dei tre leg
+(trend/momentum/volume, colorati per stato) e la distanza di stop
+suggerita dall'ATR. Il fetch dati e il calcolo girano su un thread
+separato per non bloccare l'interfaccia.
+
 ## Sviluppo
 
 ```bash
