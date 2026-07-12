@@ -1,0 +1,103 @@
+name: Build Installers
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - version.txt
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.read.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: read
+        run: echo "version=$(tr -d '[:space:]' < version.txt)" >> "$GITHUB_OUTPUT"
+
+  build-windows:
+    needs: version
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -e . pyinstaller
+      - run: pyinstaller --noconfirm --onefile --windowed --name StockAnalyzer main.py
+      - name: Install NSIS
+        run: choco install nsis -y
+      - name: Build installer
+        run: makensis /DVERSION=${{ needs.version.outputs.version }} packaging\windows\installer.nsi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer
+          path: packaging/windows/StockAnalyzer-Setup-${{ needs.version.outputs.version }}.exe
+
+  build-macos:
+    needs: version
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -e . pyinstaller
+      - run: pyinstaller --noconfirm --windowed --name StockAnalyzer main.py
+      - name: Build dmg
+        run: |
+          hdiutil create -volname "StockAnalyzer" -srcfolder dist/StockAnalyzer.app -ov -format UDZO \
+            "StockAnalyzer-${{ needs.version.outputs.version }}.dmg"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-installer
+          path: StockAnalyzer-${{ needs.version.outputs.version }}.dmg
+
+  build-deb:
+    needs: version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -e . pyinstaller
+      - run: pyinstaller --noconfirm --onefile --name stockanalyzer main.py
+      - name: Assemble .deb tree
+        run: |
+          VERSION="${{ needs.version.outputs.version }}"
+          PKG_DIR=packaging/deb/build
+          rm -rf "$PKG_DIR"
+          mkdir -p "$PKG_DIR/DEBIAN" "$PKG_DIR/usr/bin" "$PKG_DIR/usr/share/applications"
+          sed "s/__VERSION__/$VERSION/" packaging/deb/DEBIAN/control > "$PKG_DIR/DEBIAN/control"
+          cp dist/stockanalyzer "$PKG_DIR/usr/bin/stockanalyzer"
+          chmod 755 "$PKG_DIR/usr/bin/stockanalyzer"
+          cp packaging/deb/usr/share/applications/stockanalyzer.desktop "$PKG_DIR/usr/share/applications/"
+          dpkg-deb --build --root-owner-group "$PKG_DIR" "stockanalyzer_${VERSION}_amd64.deb"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-deb
+          path: stockanalyzer_${{ needs.version.outputs.version }}_amd64.deb
+
+  release:
+    needs: [version, build-windows, build-macos, build-deb]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ needs.version.outputs.version }}
+          name: StockAnalyzer v${{ needs.version.outputs.version }}
+          files: |
+            artifacts/windows-installer/*
+            artifacts/macos-installer/*
+            artifacts/linux-deb/*

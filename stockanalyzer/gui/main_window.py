@@ -1,6 +1,6 @@
 import sys
 
-from PySide6.QtGui import QColor
+from PySide6.QtGui import QAction, QColor
 from PySide6.QtWidgets import (
     QApplication,
     QComboBox,
@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QMainWindow,
+    QMessageBox,
     QProgressBar,
     QPushButton,
     QStatusBar,
@@ -18,6 +19,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from .. import __version__
 from ..engine import AnalysisResult
 from .worker import AnalysisWorker
 
@@ -27,6 +29,36 @@ LEG_COLORS = {
     "veto": QColor("#c62828"),
 }
 
+GUIDE_TEXT = """\
+<b>Come cercare</b><br>
+Nel campo in alto puoi inserire un ticker (es. <i>AAPL</i>) oppure il nome
+dell'azienda (es. <i>Apple</i>): la ricerca risolve automaticamente il
+simbolo corretto prima di scaricare i dati.<br><br>
+
+<b>Come leggere il risultato</b><br>
+- <b>Direzione</b>: bullish/bearish/neutral, stabilita dal trend primario
+(EMA 50/200 + posizione del prezzo).<br>
+- <b>Confidenza (0-100)</b> e <b>conferme</b>: quanto gli altri leg
+confermano la direzione. Non è un segnale binario di buy/sell: un
+punteggio basso o ambiguo significa che il mercato non dà un'indicazione
+chiara.<br><br>
+
+<b>I tre leg</b><br>
+- <b>trend</b> (EMA 50/200): l'unico che stabilisce la direzione.<br>
+- <b>momentum</b> (RSI 14): filtro, non trigger. Conferma il trend,
+resta neutro, oppure mette veto se il trend è già esteso in
+ipercomprato/ipervenduto.<br>
+- <b>volume</b> (relativo alla media a 20 giorni): conferma se il
+movimento è supportato da volume, veto se è sottile e quindi a rischio
+falso segnale.<br><br>
+
+Verde = conferma, grigio = neutro, rosso = veto.<br><br>
+
+<b>Rischio</b><br>
+L'ATR(14) non entra nel punteggio: fornisce solo la distanza di stop
+suggerita, mostrata in basso insieme a prezzo e ATR.
+"""
+
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -34,7 +66,31 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("StockAnalyzer")
         self.resize(720, 520)
         self._worker: AnalysisWorker | None = None
+        self._build_menu()
         self._build_ui()
+
+    def _build_menu(self):
+        self.help_menu = self.menuBar().addMenu("&Aiuto")
+
+        self.guide_action = QAction("&Guida", self)
+        self.guide_action.triggered.connect(self._show_guide)
+        self.help_menu.addAction(self.guide_action)
+
+        self.about_action = QAction("&Informazioni su StockAnalyzer", self)
+        self.about_action.triggered.connect(self._show_about)
+        self.help_menu.addAction(self.about_action)
+
+    def _show_guide(self):
+        QMessageBox.information(self, "Guida", GUIDE_TEXT)
+
+    def _show_about(self):
+        QMessageBox.about(
+            self,
+            "Informazioni su StockAnalyzer",
+            f"<b>StockAnalyzer</b> v{__version__}<br><br>"
+            "Motore di trend-confirmation basato su regole "
+            "(EMA 50/200, RSI, ATR, volume) con GUI Qt6.",
+        )
 
     def _build_ui(self):
         central = QWidget()
@@ -43,7 +99,7 @@ class MainWindow(QMainWindow):
 
         form_row = QHBoxLayout()
         self.ticker_input = QLineEdit()
-        self.ticker_input.setPlaceholderText("Ticker, es. AAPL")
+        self.ticker_input.setPlaceholderText("Ticker o nome azienda, es. AAPL oppure Apple")
         self.ticker_input.returnPressed.connect(self._on_analyze_clicked)
 
         self.period_combo = QComboBox()
@@ -64,6 +120,10 @@ class MainWindow(QMainWindow):
         form_row.addWidget(self.interval_combo)
         form_row.addWidget(self.analyze_button)
         layout.addLayout(form_row)
+
+        self.symbol_label = QLabel("")
+        self.symbol_label.setStyleSheet("color: #757575;")
+        layout.addWidget(self.symbol_label)
 
         self.direction_label = QLabel("-")
         self.direction_label.setStyleSheet("font-size: 22px; font-weight: bold;")
@@ -100,25 +160,26 @@ class MainWindow(QMainWindow):
         self.setStatusBar(self.status_bar)
 
     def _on_analyze_clicked(self):
-        ticker = self.ticker_input.text().strip().upper()
-        if not ticker:
-            self.status_bar.showMessage("Inserisci un ticker.")
+        query = self.ticker_input.text().strip()
+        if not query:
+            self.status_bar.showMessage("Inserisci un ticker o il nome di un'azienda.")
             return
 
         self.analyze_button.setEnabled(False)
-        self.status_bar.showMessage(f"Analisi di {ticker} in corso...")
+        self.status_bar.showMessage(f"Ricerca di '{query}' e analisi in corso...")
 
         self._worker = AnalysisWorker(
-            ticker, self.period_combo.currentText(), self.interval_combo.currentText()
+            query, self.period_combo.currentText(), self.interval_combo.currentText()
         )
         self._worker.succeeded.connect(self._on_result)
         self._worker.failed.connect(self._on_error)
         self._worker.start()
 
-    def _on_result(self, result: AnalysisResult):
+    def _on_result(self, result: AnalysisResult, symbol: str, name: str):
         self.analyze_button.setEnabled(True)
         self.status_bar.showMessage("Analisi completata.")
 
+        self.symbol_label.setText(f"{symbol} — {name}" if name != symbol else symbol)
         self.direction_label.setText(result.direction.upper())
         self.score_bar.setValue(int(result.score))
         self.confirmations_label.setText(f"Conferme: {result.confirmations}/{result.total_legs}")

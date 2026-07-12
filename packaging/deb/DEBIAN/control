@@ -1,0 +1,10 @@
+Package: stockanalyzer
+Version: __VERSION__
+Section: utils
+Priority: optional
+Architecture: amd64
+Maintainer: StockAnalyzer <noreply@example.com>
+Description: Rule-based trend confirmation engine with Qt6 GUI
+ StockAnalyzer analizza titoli azionari tramite EMA 50/200, RSI, ATR e
+ volume relativo, restituendo un punteggio di confidenza (0-100) invece
+ di un segnale binario buy/sell/hold.

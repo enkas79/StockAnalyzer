@@ -1,7 +1,7 @@
 [project]
 name = "stockanalyzer"
-version = "0.1.0"
-description = "Rule-based trend confirmation engine for OHLCV data"
+dynamic = ["version"]
+description = "Rule-based trend confirmation engine for OHLCV data, with a Qt6 GUI"
 requires-python = ">=3.10"
 dependencies = [
     "pandas>=2.0",
@@ -22,3 +22,6 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 include = ["stockanalyzer*"]
+
+[tool.setuptools.dynamic]
+version = { file = "version.txt" }

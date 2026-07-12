@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=StockAnalyzer
+Comment=Rule-based trend confirmation engine with Qt6 GUI
+Exec=/usr/bin/stockanalyzer
+Terminal=false
+Categories=Office;Finance;

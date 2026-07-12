@@ -36,15 +36,29 @@ for leg in result.legs:
 
 ```bash
 pip install -e .
-python run_gui.py
+python main.py
 # oppure, dopo l'installazione: stockanalyzer-gui
 ```
 
-Inserisci un ticker, scegli periodo/intervallo e premi "Analizza": la GUI
+Nel campo di ricerca puoi inserire un ticker (`AAPL`) oppure il nome
+dell'azienda (`Apple`): il simbolo viene risolto automaticamente prima di
+scaricare i dati. Scegli periodo/intervallo e premi "Analizza": la GUI
 mostra direzione, punteggio di confidenza, il dettaglio dei tre leg
 (trend/momentum/volume, colorati per stato) e la distanza di stop
 suggerita dall'ATR. Il fetch dati e il calcolo girano su un thread
-separato per non bloccare l'interfaccia.
+separato per non bloccare l'interfaccia. Il menu **Aiuto** contiene la
+guida all'uso e le informazioni sulla versione del programma.
+
+## Versione e pacchetti di installazione
+
+La versione corrente è in [`version.txt`](version.txt) ed è la fonte
+unica usata sia dal pacchetto Python (`pyproject.toml`, versione
+dinamica) sia dalla GUI (mostrata in Aiuto → Informazioni). Ad ogni push
+su `main` che modifica `version.txt`, il workflow
+[`.github/workflows/build-installers.yml`](.github/workflows/build-installers.yml)
+genera automaticamente l'installer Windows (`.exe`), il pacchetto macOS
+(`.dmg`) e il pacchetto Debian/Ubuntu (`.deb`), e li allega a una GitHub
+Release taggata `vX.Y.Z`.
 
 ## Sviluppo
 
