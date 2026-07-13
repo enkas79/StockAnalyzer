@@ -1,4 +1,10 @@
-"""OHLCV data fetching via Yahoo Finance."""
+"""OHLCV data fetching via Yahoo Finance, with a Stooq fallback and a disk cache."""
+
+import io
+import os
+import time
+import urllib.request
+from pathlib import Path
 
 import pandas as pd
 import yfinance as yf
@@ -6,6 +12,12 @@ import yfinance as yf
 from .engine import MIN_BARS
 
 REQUIRED_COLUMNS = ["open", "high", "low", "close", "volume"]
+
+# How long a cached fetch stays fresh before we hit the network again.
+CACHE_TTL_SECONDS = 15 * 60
+
+# Stooq only serves daily/weekly/monthly bars, not intraday.
+_STOOQ_INTERVALS = {"1d": "d", "1wk": "w", "1mo": "m"}
 
 # Selectable periods, in Yahoo Finance's `period` format, with an Italian
 # label and an approximate calendar-day span used to size the interval.
@@ -140,18 +152,133 @@ def resolve_ticker(query: str) -> tuple[str, str]:
     return query.upper(), query.upper()
 
 
-def fetch_ohlcv(ticker: str, period: str = "1y", interval: str = "1d") -> pd.DataFrame:
-    """Fetch OHLCV history for a ticker, with lower-case single-level columns."""
+def _cache_dir() -> Path:
+    override = os.environ.get("STOCKANALYZER_CACHE_DIR")
+    if override:
+        path = Path(override)
+    else:
+        xdg = os.environ.get("XDG_CACHE_HOME")
+        base = Path(xdg) if xdg else Path.home() / ".cache"
+        path = base / "stockanalyzer"
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def _cache_path(ticker: str, period: str, interval: str) -> Path:
+    safe_ticker = "".join(c if c.isalnum() else "_" for c in ticker.upper())
+    return _cache_dir() / f"{safe_ticker}_{period}_{interval}.csv"
+
+
+def _read_cache(cache_path: Path) -> pd.DataFrame | None:
+    if not cache_path.exists():
+        return None
+    age_seconds = time.time() - cache_path.stat().st_mtime
+    if age_seconds >= CACHE_TTL_SECONDS:
+        return None
+    try:
+        return pd.read_csv(cache_path, index_col=0, parse_dates=True)
+    except Exception:
+        return None
+
+
+def _write_cache(cache_path: Path, df: pd.DataFrame) -> None:
+    try:
+        df.to_csv(cache_path)
+    except Exception:
+        pass  # caching is best-effort; a failure here shouldn't break the fetch
+
+
+def _fetch_from_yahoo(ticker: str, period: str, interval: str) -> pd.DataFrame:
     raw = yf.download(ticker, period=period, interval=interval, progress=False, auto_adjust=False)
     if raw.empty:
         raise ValueError(f"Nessun dato trovato per il ticker '{ticker}'")
 
     if isinstance(raw.columns, pd.MultiIndex):
         raw.columns = raw.columns.get_level_values(0)
-    df = raw.rename(columns=str.lower)
+    return raw.rename(columns=str.lower)
+
+
+def _stooq_symbol(ticker: str) -> str:
+    return ticker.lower() if "." in ticker else f"{ticker.lower()}.us"
+
+
+def _period_to_days(period: str) -> int:
+    for code, _label, days in PERIOD_CHOICES:
+        if code == period:
+            return days
+    return 365
+
+
+def _download_stooq_csv(url: str) -> str:
+    """Thin, mockable wrapper around the actual HTTP GET."""
+    with urllib.request.urlopen(url, timeout=10) as response:  # noqa: S310 - fixed https://stooq.com host
+        return response.read().decode("utf-8")
+
+
+def _fetch_from_stooq(ticker: str, period: str, interval: str) -> pd.DataFrame:
+    """Daily/weekly/monthly fallback for when Yahoo Finance has no data for `ticker`.
+
+    Stooq's own exchange suffixes don't always match Yahoo's (e.g. some
+    non-US listings use different codes), so this is a best-effort fallback,
+    not a guaranteed substitute — any failure here should surface alongside
+    the original Yahoo error, not replace it with a confusing one.
+    """
+    stooq_interval = _STOOQ_INTERVALS.get(interval)
+    if stooq_interval is None:
+        raise ValueError(
+            f"Stooq copre solo dati giornalieri/settimanali/mensili, non '{interval}'."
+        )
+
+    symbol = _stooq_symbol(ticker)
+    url = f"https://stooq.com/q/d/l/?s={symbol}&i={stooq_interval}"
+    csv_text = _download_stooq_csv(url)
+    raw = pd.read_csv(io.StringIO(csv_text))
+    if raw.empty or "Close" not in raw.columns:
+        raise ValueError(f"Nessun dato Stooq per '{symbol}'")
+
+    raw["Date"] = pd.to_datetime(raw["Date"])
+    df = raw.set_index("Date").sort_index().rename(columns=str.lower)
+
+    cutoff = df.index.max() - pd.Timedelta(days=_period_to_days(period))
+    return df[df.index >= cutoff]
+
+
+def fetch_ohlcv(ticker: str, period: str = "1y", interval: str = "1d", use_cache: bool = True) -> pd.DataFrame:
+    """Fetch OHLCV history for a ticker, with lower-case single-level columns.
+
+    Tries Yahoo Finance first, falls back to Stooq (daily/weekly/monthly
+    only) if Yahoo has no data, and serves/stores a short-lived disk cache
+    so repeated analyses of the same ticker/period/interval don't always
+    hit the network.
+    """
+    cache_path = _cache_path(ticker, period, interval) if use_cache else None
+    if cache_path is not None:
+        cached = _read_cache(cache_path)
+        if cached is not None:
+            return cached
+
+    errors = []
+    df = None
+    try:
+        df = _fetch_from_yahoo(ticker, period, interval)
+    except Exception as exc:
+        errors.append(f"Yahoo Finance: {exc}")
+
+    if df is None:
+        try:
+            df = _fetch_from_stooq(ticker, period, interval)
+        except Exception as exc:
+            errors.append(f"Stooq: {exc}")
+
+    if df is None:
+        raise ValueError(f"Nessun dato trovato per il ticker '{ticker}'. " + "; ".join(errors))
 
     missing = [col for col in REQUIRED_COLUMNS if col not in df.columns]
     if missing:
         raise ValueError(f"Dati incompleti per '{ticker}': mancano le colonne {missing}")
+    df = df[REQUIRED_COLUMNS]
 
-    return df[REQUIRED_COLUMNS]
+    if cache_path is not None:
+        _write_cache(cache_path, df)
+
+    return df

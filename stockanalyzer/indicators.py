@@ -39,3 +39,24 @@ def relative_volume(volume: pd.Series, period: int = 20) -> pd.Series:
     """Current volume as a multiple of its trailing average."""
     avg = volume.rolling(period).mean()
     return volume / avg
+
+
+def macd(
+    close: pd.Series, fast: int = 12, slow: int = 26, signal: int = 9
+) -> tuple[pd.Series, pd.Series, pd.Series]:
+    """Returns (macd_line, signal_line, histogram)."""
+    macd_line = ema(close, fast) - ema(close, slow)
+    signal_line = macd_line.ewm(span=signal, adjust=False).mean()
+    histogram = macd_line - signal_line
+    return macd_line, signal_line, histogram
+
+
+def bollinger_bands(
+    close: pd.Series, period: int = 20, num_std: float = 2.0
+) -> tuple[pd.Series, pd.Series, pd.Series]:
+    """Returns (middle, upper, lower) bands."""
+    middle = close.rolling(period).mean()
+    std = close.rolling(period).std()
+    upper = middle + num_std * std
+    lower = middle - num_std * std
+    return middle, upper, lower

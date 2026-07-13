@@ -87,3 +87,50 @@ def test_suggested_stop_distance_scales_with_atr():
     result = analyze(df, atr_stop_multiplier=2.0)
 
     assert result.suggested_stop_distance == pytest.approx(result.atr * 2.0, abs=1e-3)
+
+
+def test_extra_legs_are_off_by_default():
+    t = np.arange(250)
+    close = 100 + 0.3 * t + 3 * np.sin(t / 5.0)
+    volume = np.full(250, 1000.0)
+    df = _make_df(close, volume)
+
+    result = analyze(df)
+
+    assert result.total_legs == 3
+    assert {leg.name for leg in result.legs} == {"trend", "momentum", "volume"}
+
+
+def test_macd_leg_confirms_sustained_uptrend():
+    t = np.arange(250)
+    close = 100 + 0.3 * t  # monotonic ramp: MACD line stays above its signal line
+    volume = np.full(250, 1000.0)
+    df = _make_df(close, volume)
+
+    result = analyze(df, extra_legs=frozenset({"macd"}))
+
+    leg_states = {leg.name: leg.state for leg in result.legs}
+    assert result.total_legs == 4
+    assert leg_states["macd"] == "confirm"
+
+
+def test_bollinger_leg_added_when_requested():
+    t = np.arange(250)
+    close = 100 + 0.3 * t + 3 * np.sin(t / 5.0)
+    volume = np.full(250, 1000.0)
+    df = _make_df(close, volume)
+
+    result = analyze(df, extra_legs=frozenset({"bollinger"}))
+
+    assert result.total_legs == 4
+    assert "bollinger" in {leg.name for leg in result.legs}
+
+
+def test_unknown_extra_leg_raises():
+    t = np.arange(250)
+    close = 100 + 0.3 * t
+    volume = np.full(250, 1000.0)
+    df = _make_df(close, volume)
+
+    with pytest.raises(ValueError):
+        analyze(df, extra_legs=frozenset({"not_a_real_leg"}))

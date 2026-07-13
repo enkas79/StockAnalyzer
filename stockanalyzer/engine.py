@@ -26,6 +26,11 @@ TREND_WEIGHT = 0.5
 MOMENTUM_WEIGHT = 0.25
 VOLUME_WEIGHT = 0.25
 
+# Optional legs (off by default): enabling one adds its weight to the total
+# and the score is renormalized, so the default 3-leg score is unaffected.
+EXTRA_LEG_WEIGHTS = {"macd": 0.15, "bollinger": 0.15}
+VALID_EXTRA_LEGS = frozenset(EXTRA_LEG_WEIGHTS)
+
 RSI_OVERBOUGHT = 70
 RSI_OVERSOLD = 30
 RELATIVE_VOLUME_CONFIRM = 1.2
@@ -118,6 +123,63 @@ def _momentum_leg(direction: str, rsi_value: float) -> Leg:
     return Leg("momentum", "neutral", f"RSI {rsi_value:.1f} non conferma né nega il trend.")
 
 
+def _macd_leg(direction: str, macd_line: float, signal_line: float) -> Leg:
+    if direction == "neutral" or pd.isna(macd_line) or pd.isna(signal_line):
+        return Leg("macd", "neutral", "Nessun trend primario, o MACD non ancora disponibile.")
+
+    bullish_cross = macd_line > signal_line
+    if direction == "bullish":
+        if bullish_cross:
+            return Leg(
+                "macd", "confirm",
+                f"MACD ({macd_line:.3f}) sopra la signal line: momentum rialzista confermato.",
+            )
+        return Leg(
+            "macd", "veto",
+            f"MACD ({macd_line:.3f}) sotto la signal line: momentum in contrasto col trend rialzista.",
+        )
+
+    if not bullish_cross:
+        return Leg(
+            "macd", "confirm",
+            f"MACD ({macd_line:.3f}) sotto la signal line: momentum ribassista confermato.",
+        )
+    return Leg(
+        "macd", "veto",
+        f"MACD ({macd_line:.3f}) sopra la signal line: momentum in contrasto col trend ribassista.",
+    )
+
+
+def _bollinger_leg(direction: str, price: float, upper: float, lower: float) -> Leg:
+    if direction == "neutral" or pd.isna(upper) or pd.isna(lower):
+        return Leg("bollinger", "neutral", "Nessun trend primario, o bande di Bollinger non ancora disponibili.")
+
+    if direction == "bullish":
+        if price >= upper:
+            return Leg(
+                "bollinger", "veto",
+                f"Prezzo sopra la banda superiore ({upper:.2f}): trend rialzista già esteso, rischio ritracciamento.",
+            )
+        if price <= lower:
+            return Leg(
+                "bollinger", "veto",
+                f"Prezzo sotto la banda inferiore ({lower:.2f}): pullback profondo, trend rialzista non supportato.",
+            )
+        return Leg("bollinger", "confirm", "Prezzo entro le bande: spazio di movimento nella direzione del trend.")
+
+    if price <= lower:
+        return Leg(
+            "bollinger", "veto",
+            f"Prezzo sotto la banda inferiore ({lower:.2f}): trend ribassista già esteso, rischio rimbalzo.",
+        )
+    if price >= upper:
+        return Leg(
+            "bollinger", "veto",
+            f"Prezzo sopra la banda superiore ({upper:.2f}): rimbalzo forte, trend ribassista non supportato.",
+        )
+    return Leg("bollinger", "confirm", "Prezzo entro le bande: spazio di movimento nella direzione del trend.")
+
+
 def _volume_leg(direction: str, rel_volume: float) -> Leg:
     if direction == "neutral" or pd.isna(rel_volume):
         return Leg("volume", "neutral", "Nessun trend primario, o volume medio non ancora disponibile.")
@@ -135,17 +197,29 @@ def _volume_leg(direction: str, rel_volume: float) -> Leg:
     return Leg("volume", "neutral", f"Volume {rel_volume:.2f}x la media a 20 giorni: nella norma.")
 
 
-def analyze(df: pd.DataFrame, atr_stop_multiplier: float = 1.5) -> AnalysisResult:
+def analyze(
+    df: pd.DataFrame,
+    atr_stop_multiplier: float = 1.5,
+    extra_legs: frozenset[str] = frozenset(),
+) -> AnalysisResult:
     """Score how well momentum and volume confirm the EMA50/200 trend.
 
     `df` must have lower-case columns open/high/low/close/volume, sorted by
     date ascending, with at least MIN_BARS rows.
+
+    `extra_legs` optionally adds "macd" and/or "bollinger" as further
+    confirm/neutral/veto legs (see VALID_EXTRA_LEGS); their weight is added
+    to the total and the score renormalized, so leaving it empty (the
+    default) reproduces the original 3-leg score unchanged.
     """
     if len(df) < MIN_BARS:
         raise ValueError(
             f"Servono almeno {MIN_BARS} barre per calcolare EMA200 in modo affidabile, "
             f"ricevute {len(df)}."
         )
+    unknown = extra_legs - VALID_EXTRA_LEGS
+    if unknown:
+        raise ValueError(f"Leg sconosciuti: {sorted(unknown)}")
 
     ema50 = indicators.ema(df["close"], 50)
     ema200 = indicators.ema(df["close"], 200)
@@ -166,7 +240,19 @@ def analyze(df: pd.DataFrame, atr_stop_multiplier: float = 1.5) -> AnalysisResul
 
     legs = [trend_leg, momentum_leg, volume_leg]
     weights = {"trend": TREND_WEIGHT, "momentum": MOMENTUM_WEIGHT, "volume": VOLUME_WEIGHT}
-    score = 100 * sum(weights[leg.name] * LEG_STATE_SCORE[leg.state] for leg in legs)
+
+    if "macd" in extra_legs:
+        macd_line, signal_line, _hist = indicators.macd(df["close"])
+        legs.append(_macd_leg(direction, float(macd_line.iloc[-1]), float(signal_line.iloc[-1])))
+        weights["macd"] = EXTRA_LEG_WEIGHTS["macd"]
+
+    if "bollinger" in extra_legs:
+        _middle, upper, lower = indicators.bollinger_bands(df["close"])
+        legs.append(_bollinger_leg(direction, price, float(upper.iloc[-1]), float(lower.iloc[-1])))
+        weights["bollinger"] = EXTRA_LEG_WEIGHTS["bollinger"]
+
+    total_weight = sum(weights.values())
+    score = 100 * sum(weights[leg.name] * LEG_STATE_SCORE[leg.state] for leg in legs) / total_weight
     confirmations = sum(1 for leg in legs if leg.state == "confirm")
 
     return AnalysisResult(
