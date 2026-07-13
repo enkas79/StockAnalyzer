@@ -144,36 +144,96 @@ QMenuBar {
 """
 
 GUIDE_TEXT = """\
-<b>Come cercare</b><br>
-Nel campo in alto puoi inserire un ticker (es. <i>AAPL</i>) oppure il nome
+<b>1. Come cercare un titolo</b><br>
+Nel campo Ticker puoi inserire un ticker (es. <i>AAPL</i>) oppure il nome
 dell'azienda (es. <i>Eni</i>). Dopo un paio di lettere compare un elenco
 di aziende corrispondenti con simbolo e borsa (es. <i>ENI.MI</i> — Eni
 S.p.A., Milan): seleziona quella giusta dall'elenco prima di premere
-"Analizza". Se scrivi un ticker esatto già noto (es. <i>AAPL</i>) puoi
-anche analizzare direttamente senza scegliere dall'elenco.<br><br>
+"Analizza", così il ticker usato è esattamente quello scelto. Se scrivi
+un ticker esatto già noto (es. <i>AAPL</i>) puoi anche analizzare
+direttamente senza passare dall'elenco.<br><br>
 
-<b>Come leggere il risultato</b><br>
-- <b>Direzione</b>: bullish/bearish/neutral, stabilita dal trend primario
-(EMA 50/200 + posizione del prezzo).<br>
+<b>2. Periodo e intervallo</b><br>
+Il periodo va da una settimana a 5 anni. L'elenco degli intervalli
+disponibili si aggiorna automaticamente in base al periodo scelto, in
+modo da garantire sempre almeno 200 candele (necessarie per calcolare
+l'EMA200 in modo affidabile): per i periodi corti (settimana, mese, 3/6
+mesi) vengono proposti solo intervalli intraday (es. 5m, 30m, 1h),
+mentre da 1 anno in su resta disponibile anche il giornaliero. La stima
+del numero di candele è mostrata sotto i menu.<br><br>
+
+<b>3. Leg opzionali</b><br>
+Le caselle MACD e Bollinger Bands aggiungono due leg di conferma
+facoltativi (disattivati di default). Se li attivi, il punteggio si
+ricalcola automaticamente includendo il loro peso, quindi il punteggio a
+3 leg di default non cambia finché restano spenti.<br><br>
+
+<b>4. Come leggere il risultato</b><br>
+- <b>Direzione</b>: bullish/bearish/neutral, stabilita dal trend
+primario (EMA 50/200 + posizione del prezzo).<br>
 - <b>Confidenza (0-100)</b> e <b>conferme</b>: quanto gli altri leg
 confermano la direzione. Non è un segnale binario di buy/sell: un
 punteggio basso o ambiguo significa che il mercato non dà un'indicazione
 chiara.<br><br>
 
-<b>I tre leg</b><br>
+<b>5. I leg</b><br>
 - <b>trend</b> (EMA 50/200): l'unico che stabilisce la direzione.<br>
 - <b>momentum</b> (RSI 14): filtro, non trigger. Conferma il trend,
 resta neutro, oppure mette veto se il trend è già esteso in
 ipercomprato/ipervenduto.<br>
 - <b>volume</b> (relativo alla media a 20 giorni): conferma se il
 movimento è supportato da volume, veto se è sottile e quindi a rischio
-falso segnale.<br><br>
+falso segnale.<br>
+- <b>macd</b> (opzionale): confronta la MACD line con la signal line;
+conferma se concorde con la direzione del trend, veto se in contrasto.<br>
+- <b>bollinger</b> (opzionale): veto se il prezzo è già oltre la banda
+nella direzione del trend (movimento troppo esteso, rischio
+ritracciamento/rimbalzo), altrimenti conferma.<br><br>
 
 Verde = conferma, grigio = neutro, rosso = veto.<br><br>
 
-<b>Rischio</b><br>
+<b>6. Rischio e position sizing</b><br>
 L'ATR(14) non entra nel punteggio: fornisce solo la distanza di stop
-suggerita, mostrata in basso insieme a prezzo e ATR.
+suggerita, mostrata insieme a prezzo e ATR. Inserendo il capitale e il
+rischio % per trade, la size suggerita è calcolata come
+(capitale × rischio%) ÷ distanza di stop, arrotondata per difetto alle
+azioni intere.<br><br>
+
+<b>7. Scheda Grafico</b><br>
+Mostra il prezzo con EMA50/EMA200 sovrapposte e, sotto, l'RSI(14) con le
+soglie di ipercomprato (70) e ipervenduto (30), per l'ultimo ticker
+analizzato nella scheda Analisi.<br><br>
+
+<b>8. Scheda Watchlist</b><br>
+Aggiungi più ticker a una lista salvata tra le sessioni. "Analizza
+tutti" li scarica e valuta uno alla volta su un thread separato, senza
+bloccare l'interfaccia, e popola una tabella ordinabile (clicca
+sull'intestazione di una colonna per ordinare) con direzione,
+confidenza e conferme. Un ticker che fallisce (es. non trovato) resta
+visibile in tabella con l'errore, senza interrompere l'analisi degli
+altri.<br><br>
+
+<b>9. Backtest (da codice, non ancora in questa finestra)</b><br>
+Il modulo <i>stockanalyzer.backtest</i> fa scorrere il motore su una
+finestra storica crescente e confronta ogni chiamata direzionale
+(bullish/bearish; i casi neutral non contano) con il rendimento
+realizzato un certo numero di candele dopo, per verificare quanto le
+chiamate del motore siano state coerenti con i movimenti successivi.
+Non è un simulatore di trading: nessun costo, slippage o size viene
+modellato, è solo un controllo di coerenza del punteggio. Si usa così:<br>
+<code>from stockanalyzer.backtest import run_backtest<br>
+result = run_backtest(df, forward_bars=10, step=5)<br>
+print(result.hit_rate, result.avg_forward_return)<br>
+print(result.by_score_bucket)  # dettaglio per fascia di punteggio</code><br>
+<i>forward_bars</i> è quante candele dopo si misura il rendimento,
+<i>step</i> ogni quante candele si ripete il test (per velocità).
+<i>result.by_score_bucket</i> suddivide i risultati in tre fasce di
+punteggio (0-33, 34-66, 67-100) per vedere se un punteggio più alto
+corrisponde davvero a un tasso di successo migliore.<br><br>
+
+<b>10. Impostazioni salvate</b><br>
+Ticker, periodo, intervallo e watchlist vengono ricordati automaticamente
+alla chiusura e ripristinati al riavvio.
 """
 
 
