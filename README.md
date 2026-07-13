@@ -42,8 +42,13 @@ python main.py
 
 Nel campo di ricerca puoi inserire un ticker (`AAPL`) oppure il nome
 dell'azienda (`Apple`): il simbolo viene risolto automaticamente prima di
-scaricare i dati. Scegli periodo/intervallo e premi "Analizza": la GUI
-mostra direzione, punteggio di confidenza, il dettaglio dei tre leg
+scaricare i dati. Il periodo va da una settimana a 5 anni; l'elenco degli
+intervalli disponibili si aggiorna in base al periodo scelto in modo da
+garantire sempre almeno 200 candele (necessarie per l'EMA200) — per i
+periodi più corti (settimana, mese, 3/6 mesi) vengono proposti solo
+intervalli intraday (es. 5m, 30m, 1h), mentre per 1 anno o più resta
+disponibile anche il giornaliero. Premi "Analizza": la GUI mostra
+direzione, punteggio di confidenza, il dettaglio dei tre leg
 (trend/momentum/volume, colorati per stato) e la distanza di stop
 suggerita dall'ATR. Il fetch dati e il calcolo girano su un thread
 separato per non bloccare l'interfaccia. Il menu **Aiuto** contiene la

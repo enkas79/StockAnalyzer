@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
 )
 
 from .. import __version__
+from ..data import INTERVAL_LABELS, PERIOD_CHOICES, default_interval, estimated_bars, valid_intervals
 from ..engine import AnalysisResult
 from .worker import AnalysisWorker
 
@@ -103,11 +104,15 @@ class MainWindow(QMainWindow):
         self.ticker_input.returnPressed.connect(self._on_analyze_clicked)
 
         self.period_combo = QComboBox()
-        self.period_combo.addItems(["6mo", "1y", "2y", "5y"])
-        self.period_combo.setCurrentText("1y")
+        for code, label, _days in PERIOD_CHOICES:
+            self.period_combo.addItem(label, code)
+        self.period_combo.setCurrentIndex(
+            next(i for i, (code, _, _) in enumerate(PERIOD_CHOICES) if code == "1y")
+        )
+        self.period_combo.currentIndexChanged.connect(self._on_period_changed)
 
         self.interval_combo = QComboBox()
-        self.interval_combo.addItems(["1d", "1wk"])
+        self.interval_combo.currentIndexChanged.connect(self._update_candles_label)
 
         self.analyze_button = QPushButton("Analizza")
         self.analyze_button.clicked.connect(self._on_analyze_clicked)
@@ -120,6 +125,12 @@ class MainWindow(QMainWindow):
         form_row.addWidget(self.interval_combo)
         form_row.addWidget(self.analyze_button)
         layout.addLayout(form_row)
+
+        self.candles_label = QLabel("")
+        self.candles_label.setStyleSheet("color: #757575;")
+        layout.addWidget(self.candles_label)
+
+        self._on_period_changed()
 
         self.symbol_label = QLabel("")
         self.symbol_label.setStyleSheet("color: #757575;")
@@ -159,6 +170,33 @@ class MainWindow(QMainWindow):
         self.status_bar = QStatusBar()
         self.setStatusBar(self.status_bar)
 
+    def _selected_period_days(self) -> int:
+        code = self.period_combo.currentData()
+        return next(days for c, _label, days in PERIOD_CHOICES if c == code)
+
+    def _on_period_changed(self):
+        days = self._selected_period_days()
+        options = valid_intervals(days) or [default_interval(days)]
+        default = default_interval(days)
+
+        self.interval_combo.blockSignals(True)
+        self.interval_combo.clear()
+        for code in options:
+            self.interval_combo.addItem(INTERVAL_LABELS.get(code, code), code)
+        default_index = options.index(default) if default in options else 0
+        self.interval_combo.setCurrentIndex(default_index)
+        self.interval_combo.blockSignals(False)
+
+        self._update_candles_label()
+
+    def _update_candles_label(self):
+        days = self._selected_period_days()
+        interval = self.interval_combo.currentData()
+        if interval is None:
+            return
+        bars = int(estimated_bars(days, interval))
+        self.candles_label.setText(f"≈ {bars} candele stimate (minimo richiesto: 200)")
+
     def _on_analyze_clicked(self):
         query = self.ticker_input.text().strip()
         if not query:
@@ -169,7 +207,7 @@ class MainWindow(QMainWindow):
         self.status_bar.showMessage(f"Ricerca di '{query}' e analisi in corso...")
 
         self._worker = AnalysisWorker(
-            query, self.period_combo.currentText(), self.interval_combo.currentText()
+            query, self.period_combo.currentData(), self.interval_combo.currentData()
         )
         self._worker.succeeded.connect(self._on_result)
         self._worker.failed.connect(self._on_error)
