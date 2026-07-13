@@ -1,5 +1,6 @@
 import sys
 
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QAction, QColor
 from PySide6.QtWidgets import (
     QApplication,
@@ -8,6 +9,7 @@ from PySide6.QtWidgets import (
     QHeaderView,
     QLabel,
     QLineEdit,
+    QListWidget,
     QMainWindow,
     QMessageBox,
     QProgressBar,
@@ -22,7 +24,10 @@ from PySide6.QtWidgets import (
 from .. import __version__
 from ..data import INTERVAL_LABELS, PERIOD_CHOICES, default_interval, estimated_bars, valid_intervals
 from ..engine import AnalysisResult
-from .worker import AnalysisWorker
+from .worker import AnalysisWorker, SearchWorker
+
+SEARCH_DEBOUNCE_MS = 350
+SEARCH_MIN_CHARS = 2
 
 LEG_COLORS = {
     "confirm": QColor("#2e7d32"),
@@ -33,8 +38,11 @@ LEG_COLORS = {
 GUIDE_TEXT = """\
 <b>Come cercare</b><br>
 Nel campo in alto puoi inserire un ticker (es. <i>AAPL</i>) oppure il nome
-dell'azienda (es. <i>Apple</i>): la ricerca risolve automaticamente il
-simbolo corretto prima di scaricare i dati.<br><br>
+dell'azienda (es. <i>Eni</i>). Dopo un paio di lettere compare un elenco
+di aziende corrispondenti con simbolo e borsa (es. <i>ENI.MI</i> — Eni
+S.p.A., Milan): seleziona quella giusta dall'elenco prima di premere
+"Analizza". Se scrivi un ticker esatto già noto (es. <i>AAPL</i>) puoi
+anche analizzare direttamente senza scegliere dall'elenco.<br><br>
 
 <b>Come leggere il risultato</b><br>
 - <b>Direzione</b>: bullish/bearish/neutral, stabilita dal trend primario
@@ -67,6 +75,11 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("StockAnalyzer")
         self.resize(720, 520)
         self._worker: AnalysisWorker | None = None
+        self._search_worker: SearchWorker | None = None
+        self._search_timer = QTimer(self)
+        self._search_timer.setSingleShot(True)
+        self._search_timer.timeout.connect(self._run_search)
+        self._resolved: tuple[str, str] | None = None  # (symbol, name) picked from search list
         self._build_menu()
         self._build_ui()
 
@@ -100,8 +113,9 @@ class MainWindow(QMainWindow):
 
         form_row = QHBoxLayout()
         self.ticker_input = QLineEdit()
-        self.ticker_input.setPlaceholderText("Ticker o nome azienda, es. AAPL oppure Apple")
+        self.ticker_input.setPlaceholderText("Ticker o nome azienda, es. AAPL oppure Eni")
         self.ticker_input.returnPressed.connect(self._on_analyze_clicked)
+        self.ticker_input.textEdited.connect(self._on_ticker_text_edited)
 
         self.period_combo = QComboBox()
         for code, label, _days in PERIOD_CHOICES:
@@ -125,6 +139,12 @@ class MainWindow(QMainWindow):
         form_row.addWidget(self.interval_combo)
         form_row.addWidget(self.analyze_button)
         layout.addLayout(form_row)
+
+        self.results_list = QListWidget()
+        self.results_list.setMaximumHeight(120)
+        self.results_list.itemClicked.connect(self._on_candidate_selected)
+        self.results_list.hide()
+        layout.addWidget(self.results_list)
 
         self.candles_label = QLabel("")
         self.candles_label.setStyleSheet("color: #757575;")
@@ -197,17 +217,63 @@ class MainWindow(QMainWindow):
         bars = int(estimated_bars(days, interval))
         self.candles_label.setText(f"≈ {bars} candele stimate (minimo richiesto: 200)")
 
+    def _on_ticker_text_edited(self, _text: str):
+        self._resolved = None  # any earlier pick no longer matches what's typed
+        self.results_list.hide()
+        self._search_timer.stop()
+        if len(self.ticker_input.text().strip()) >= SEARCH_MIN_CHARS:
+            self._search_timer.start(SEARCH_DEBOUNCE_MS)
+
+    def _run_search(self):
+        query = self.ticker_input.text().strip()
+        if len(query) < SEARCH_MIN_CHARS:
+            return
+        self._search_worker = SearchWorker(query)
+        self._search_worker.found.connect(self._on_search_results)
+        self._search_worker.start()
+
+    def _on_search_results(self, query: str, candidates: list[dict]):
+        # Discard stale results if the user kept typing after this search started.
+        if query != self.ticker_input.text().strip():
+            return
+
+        self.results_list.clear()
+        if not candidates:
+            self.results_list.hide()
+            return
+
+        for candidate in candidates:
+            exchange = f" ({candidate['exchange']})" if candidate["exchange"] else ""
+            label = f"{candidate['symbol']} — {candidate['name']}{exchange}"
+            self.results_list.addItem(label)
+            self.results_list.item(self.results_list.count() - 1).setData(
+                Qt.UserRole, (candidate["symbol"], candidate["name"])
+            )
+        self.results_list.show()
+
+    def _on_candidate_selected(self, item):
+        symbol, name = item.data(Qt.UserRole)
+        self._resolved = (symbol, name)
+        self.ticker_input.blockSignals(True)
+        self.ticker_input.setText(symbol)
+        self.ticker_input.blockSignals(False)
+        self.results_list.hide()
+
     def _on_analyze_clicked(self):
         query = self.ticker_input.text().strip()
         if not query:
             self.status_bar.showMessage("Inserisci un ticker o il nome di un'azienda.")
             return
 
+        self.results_list.hide()
         self.analyze_button.setEnabled(False)
         self.status_bar.showMessage(f"Ricerca di '{query}' e analisi in corso...")
 
         self._worker = AnalysisWorker(
-            query, self.period_combo.currentData(), self.interval_combo.currentData()
+            query,
+            self.period_combo.currentData(),
+            self.interval_combo.currentData(),
+            resolved=self._resolved,
         )
         self._worker.succeeded.connect(self._on_result)
         self._worker.failed.connect(self._on_error)

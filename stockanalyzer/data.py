@@ -90,27 +90,52 @@ def default_interval(calendar_days: int) -> str:
     return intraday[0] if intraday else options[0]
 
 
+def search_candidates(query: str, max_results: int = 8) -> list[dict]:
+    """Look up tickers matching `query` (name or partial symbol) on Yahoo Finance.
+
+    Returns a list of {"symbol", "name", "exchange"} dicts, best match first.
+    A plain ticker like "eni" often has no exact Yahoo symbol (the Italian
+    listing is "ENI.MI") so this is what lets the caller offer the user a
+    pick-list instead of guessing a single, possibly wrong, symbol.
+    """
+    query = query.strip()
+    if not query:
+        return []
+
+    try:
+        quotes = yf.Search(query, max_results=max_results, raise_errors=False).quotes
+    except Exception:
+        return []
+
+    candidates = []
+    for quote in quotes:
+        symbol = quote.get("symbol")
+        if not symbol:
+            continue
+        name = quote.get("shortname") or quote.get("longname") or symbol
+        exchange = quote.get("exchDisp") or quote.get("exchange") or ""
+        candidates.append({"symbol": symbol, "name": name, "exchange": exchange})
+    return candidates
+
+
 def resolve_ticker(query: str) -> tuple[str, str]:
     """Resolve a ticker symbol or company name to (symbol, display_name).
 
     Runs a Yahoo Finance symbol search first so a company name (e.g.
     "Apple") works alongside an exact ticker (e.g. "AAPL"). Falls back to
     treating the query itself as a ticker if the search finds nothing or
-    the network call fails.
+    the network call fails. Prefer `search_candidates` + explicit user
+    choice when several tickers could plausibly match (e.g. "eni" matches
+    both "ENI.MI" and "E" on the NYSE) since this only ever returns the
+    top hit.
     """
     query = query.strip()
     if not query:
         raise ValueError("Ticker o nome azienda mancante.")
 
-    try:
-        quotes = yf.Search(query, max_results=5, raise_errors=False).quotes
-    except Exception:
-        quotes = []
-
-    for quote in quotes:
-        symbol = quote.get("symbol")
-        if symbol:
-            return symbol, quote.get("shortname") or quote.get("longname") or symbol
+    candidates = search_candidates(query, max_results=5)
+    if candidates:
+        return candidates[0]["symbol"], candidates[0]["name"]
 
     return query.upper(), query.upper()
 
