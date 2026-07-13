@@ -4,10 +4,11 @@ import numpy as np
 import pandas as pd
 import pytest
 from PySide6.QtCore import QSettings
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QMessageBox, QTextBrowser
 
 from stockanalyzer.engine import AnalysisResult, Leg
 from stockanalyzer.gui.main_window import DARK_STYLESHEET, MainWindow
+from stockanalyzer.updater import UpdateInfo
 
 SETTINGS_ORG = "StockAnalyzer"
 SETTINGS_APP = "StockAnalyzer"
@@ -213,3 +214,52 @@ def test_theme_choice_persists_across_windows(qtbot):
 
     assert restored._theme == "dark"
     assert restored.dark_theme_action.isChecked()
+
+
+def test_guide_dialog_is_a_fixed_size_scrollable_dialog_not_fullscreen(qtbot):
+    window = MainWindow()
+    qtbot.addWidget(window)
+
+    dialog = window._build_guide_dialog()
+    qtbot.addWidget(dialog)
+
+    assert dialog.size().width() < 1000
+    assert dialog.size().height() < 1000
+    text_browsers = dialog.findChildren(QTextBrowser)
+    assert len(text_browsers) == 1
+    assert "Backtest" in text_browsers[0].toHtml()
+
+
+def test_update_notification_shown_when_newer_version_available(qtbot):
+    window = MainWindow()
+    qtbot.addWidget(window)
+    info = UpdateInfo(version="9.9.9", url="https://example.invalid/releases/v9.9.9")
+
+    with patch.object(QMessageBox, "exec", return_value=QMessageBox.StandardButton.Ok) as mock_exec:
+        window._on_update_checked(info)
+
+    mock_exec.assert_called_once()
+
+
+def test_no_notification_when_already_up_to_date(qtbot):
+    window = MainWindow()
+    qtbot.addWidget(window)
+
+    with patch.object(QMessageBox, "exec") as mock_exec:
+        window._on_update_checked(None)
+
+    mock_exec.assert_not_called()
+
+
+def test_check_for_updates_runs_off_the_ui_thread_and_reports_back(qtbot):
+    window = MainWindow()
+    qtbot.addWidget(window)
+    info = UpdateInfo(version="9.9.9", url="https://example.invalid/releases/v9.9.9")
+
+    with (
+        patch("stockanalyzer.gui.worker.check_for_update", return_value=info),
+        patch.object(QMessageBox, "exec", return_value=QMessageBox.StandardButton.Ok),
+    ):
+        window._check_for_updates()
+        with qtbot.waitSignal(window._update_worker.checked, timeout=5000):
+            pass

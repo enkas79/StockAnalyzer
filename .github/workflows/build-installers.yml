@@ -31,7 +31,9 @@ jobs:
       - run: pip install -e . pyinstaller
       - run: pyinstaller --noconfirm --onefile --windowed --name StockAnalyzer main.py
       - name: Install NSIS
-        run: choco install nsis -y
+        run: |
+          choco install nsis -y
+          echo "C:\Program Files (x86)\NSIS" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
       - name: Build installer
         run: makensis /DVERSION=${{ needs.version.outputs.version }} packaging\windows\installer.nsi
       - uses: actions/upload-artifact@v4

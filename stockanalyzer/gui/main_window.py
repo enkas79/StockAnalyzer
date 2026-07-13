@@ -8,6 +8,8 @@ from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
     QComboBox,
+    QDialog,
+    QDialogButtonBox,
     QGroupBox,
     QHBoxLayout,
     QHeaderView,
@@ -23,6 +25,7 @@ from PySide6.QtWidgets import (
     QTabWidget,
     QTableWidget,
     QTableWidgetItem,
+    QTextBrowser,
     QVBoxLayout,
     QWidget,
 )
@@ -31,7 +34,7 @@ from .. import __version__, indicators
 from ..data import INTERVAL_LABELS, PERIOD_CHOICES, default_interval, estimated_bars, valid_intervals
 from ..engine import AnalysisResult, RSI_OVERBOUGHT, RSI_OVERSOLD
 from ..risk import position_size
-from .worker import AnalysisWorker, SearchWorker, WatchlistWorker
+from .worker import AnalysisWorker, SearchWorker, UpdateCheckWorker, WatchlistWorker
 
 SEARCH_DEBOUNCE_MS = 350
 SEARCH_MIN_CHARS = 2
@@ -301,15 +304,30 @@ ricalcola automaticamente includendo il loro peso, quindi il punteggio a
 3 leg di default non cambia finché restano spenti.<br><br>
 
 <b>4. Come leggere il risultato</b><br>
-- <b>Direzione</b>: bullish/bearish/neutral, stabilita dal trend
-primario (EMA 50/200 + posizione del prezzo).<br>
+- <b>Direzione</b> (bullish/bearish/neutral): stabilita <u>solo</u> dal
+leg trend (EMA50 rispetto a EMA200). Gli altri leg — momentum, volume,
+ed eventualmente macd/bollinger — non possono cambiarla: possono solo
+confermarla, restare neutri, o metterle veto. Per questo la direzione
+può restare "bullish"/"bearish" anche con punteggio basso e 0
+conferme: indica il regime di fondo (EMA50 sopra o sotto EMA200), non
+che sia il momento di agire.<br>
 - <b>Confidenza (0-100)</b> e <b>conferme</b>: quanto gli altri leg
-confermano la direzione. Non è un segnale binario di buy/sell: un
-punteggio basso o ambiguo significa che il mercato non dà un'indicazione
-chiara.<br><br>
+supportano quella direzione <i>adesso</i>. Un punteggio basso o
+ambiguo — anche con direzione bullish/bearish — significa che il
+mercato non dà un'indicazione chiara: non è un segnale binario di
+buy/sell.<br>
+- <b>Esempio</b>: EMA50 sopra EMA200 (struttura rialzista) ma prezzo
+sotto EMA50 (pullback), RSI neutro e volume sottile → puoi vedere
+"BULLISH" con punteggio 37/100 e 0/3 conferme. Non è un errore: la
+direzione riflette solo la struttura EMA50/200, mentre il punteggio
+basso dice che nessun altro leg conferma un ingresso adesso.<br><br>
 
 <b>5. I leg</b><br>
-- <b>trend</b> (EMA 50/200): l'unico che stabilisce la direzione.<br>
+- <b>trend</b> (EMA 50/200): l'unico che stabilisce la direzione
+(bullish se EMA50 > EMA200, bearish se EMA50 < EMA200). Il suo stato
+può essere solo confirm (prezzo anche lui sopra/sotto EMA50, in
+accordo) o neutral (prezzo in pullback/rimbalzo): mai veto, perché è
+lui a definire la direzione stessa.<br>
 - <b>momentum</b> (RSI 14): filtro, non trigger. Conferma il trend,
 resta neutro, oppure mette veto se il trend è già esteso in
 ipercomprato/ipervenduto.<br>
@@ -325,11 +343,24 @@ ritracciamento/rimbalzo), altrimenti conferma.<br><br>
 Verde = conferma, grigio = neutro, rosso = veto.<br><br>
 
 <b>6. Rischio e position sizing</b><br>
-L'ATR(14) non entra nel punteggio: fornisce solo la distanza di stop
-suggerita, mostrata insieme a prezzo e ATR. Inserendo il capitale e il
-rischio % per trade, la size suggerita è calcolata come
-(capitale × rischio%) ÷ distanza di stop, arrotondata per difetto alle
-azioni intere.<br><br>
+- <b>Prezzo</b>: ultima chiusura disponibile per il ticker.<br>
+- <b>ATR</b> (Average True Range, 14 periodi): volatilità media
+recente in valuta. Non entra nel punteggio di confidenza — serve solo
+a dimensionare il rischio.<br>
+- <b>Stop suggerito</b>: distanza dal prezzo per un eventuale
+stop-loss, pari ad ATR × 1.5 di default. È una distanza basata sulla
+volatilità storica, non un livello garantito né legato a
+supporti/resistenze specifici del titolo.<br>
+- <b>Capitale</b> e <b>Rischio per trade (%)</b>: quanto sei disposto
+a perdere in valuta se lo stop viene toccato (es. capitale 10.000 e
+rischio 1% = 100 di perdita massima accettata).<br>
+- <b>Size suggerita</b>: azioni = (capitale × rischio%) ÷ stop
+suggerito, arrotondato per difetto. Esempio: capitale 10.000, rischio
+1% (cioè 100), stop 3.00 → 33 azioni. A parità di rischio in valuta,
+uno stop più stretto (titolo meno volatile) alza la size, uno più
+largo (titolo più volatile) la abbassa.<br>
+- Questi numeri sono un calcolo meccanico sui parametri che inserisci,
+non una raccomandazione di investimento.<br><br>
 
 <b>7. Scheda Grafico</b><br>
 Mostra il prezzo con EMA50/EMA200 sovrapposte e, sotto, l'RSI(14) con le
@@ -363,9 +394,12 @@ print(result.by_score_bucket)  # dettaglio per fascia di punteggio</code><br>
 punteggio (0-33, 34-66, 67-100) per vedere se un punteggio più alto
 corrisponde davvero a un tasso di successo migliore.<br><br>
 
-<b>10. Impostazioni salvate</b><br>
-Ticker, periodo, intervallo e watchlist vengono ricordati automaticamente
-alla chiusura e ripristinati al riavvio.
+<b>10. Impostazioni salvate e aggiornamenti</b><br>
+Ticker, periodo, intervallo, watchlist e tema (menu Visualizza) vengono
+ricordati automaticamente alla chiusura e ripristinati al riavvio.
+All'avvio l'app controlla in background, su GitHub, se è disponibile
+una versione più recente: se sì, mostra un avviso con il link alla
+release, senza scaricare o installare nulla in automatico.
 """
 
 
@@ -384,6 +418,7 @@ class MainWindow(QMainWindow):
         self._watchlist_worker: WatchlistWorker | None = None
         self._watchlist_done = 0
         self._watchlist_total = 0
+        self._update_worker: UpdateCheckWorker | None = None
         self._theme = "light"
         self._last_chart: tuple[str, object] | None = None  # (symbol, df) for theme redraws
         self._settings = QSettings("StockAnalyzer", "StockAnalyzer")
@@ -449,8 +484,24 @@ class MainWindow(QMainWindow):
         self._style_chart_axes()
         self.chart_canvas.draw()
 
+    def _build_guide_dialog(self) -> QDialog:
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Guida")
+        dialog.resize(640, 560)  # fixed, centered dialog - not fullscreen
+
+        layout = QVBoxLayout(dialog)
+        text_browser = QTextBrowser()  # QAbstractScrollArea: scrolls instead of growing
+        text_browser.setOpenExternalLinks(True)
+        text_browser.setHtml(GUIDE_TEXT)
+        layout.addWidget(text_browser)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.Close)
+        buttons.rejected.connect(dialog.accept)
+        layout.addWidget(buttons)
+        return dialog
+
     def _show_guide(self):
-        QMessageBox.information(self, "Guida", GUIDE_TEXT)
+        self._build_guide_dialog().exec()
 
     def _show_about(self):
         QMessageBox.about(
@@ -460,6 +511,25 @@ class MainWindow(QMainWindow):
             "Motore di trend-confirmation basato su regole "
             "(EMA 50/200, RSI, ATR, volume) con GUI Qt6.",
         )
+
+    def _check_for_updates(self):
+        """Best-effort startup check against GitHub Releases; a no-op on any
+        failure (offline, rate-limited, ...) since it must never block or
+        break startup. Only notifies - it never downloads or installs
+        anything on its own."""
+        self._update_worker = UpdateCheckWorker(__version__)
+        self._update_worker.checked.connect(self._on_update_checked)
+        self._update_worker.start()
+
+    def _on_update_checked(self, info):
+        if info is None:
+            return
+        box = QMessageBox(self)
+        box.setIcon(QMessageBox.Information)
+        box.setWindowTitle("Aggiornamento disponibile")
+        box.setText(f"È disponibile StockAnalyzer v{info.version} (in uso: v{__version__}).")
+        box.setInformativeText(info.url)
+        box.exec()
 
     def _build_ui(self):
         tabs = QTabWidget()
@@ -993,6 +1063,7 @@ def main():
     # than a fixed pixel size that's oversized on small displays or tiny on
     # large/high-DPI ones; setMinimumSize still protects very small screens.
     window.showMaximized()
+    window._check_for_updates()
     sys.exit(app.exec())
 
 

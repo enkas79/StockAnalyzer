@@ -100,7 +100,11 @@ La finestra è divisa in tre schede:
 Ticker, periodo, intervallo, watchlist e tema vengono ricordati tra un
 avvio e l'altro. Il fetch dati e il calcolo girano sempre su un thread
 separato per non bloccare l'interfaccia. Il menu **Aiuto** contiene la
-guida all'uso e le informazioni sulla versione del programma.
+guida all'uso (in una finestra centrata e scorrevole, non a schermo
+intero) e le informazioni sulla versione del programma. All'avvio,
+l'app controlla in background se su GitHub è disponibile una versione
+più recente e, se sì, mostra un avviso con il link alla release (nessun
+download o installazione automatica).
 
 ## Versione e pacchetti di installazione
 

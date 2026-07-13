@@ -7,7 +7,10 @@
 !endif
 
 Name "StockAnalyzer"
-OutFile "StockAnalyzer-Setup-${VERSION}.exe"
+; NSIS resolves this relative to makensis's invocation directory (CI runs
+; it from the repo root), not the script's own directory - keep it in sync
+; with the path the workflow's upload-artifact step expects.
+OutFile "packaging\windows\StockAnalyzer-Setup-${VERSION}.exe"
 InstallDir "$PROGRAMFILES64\StockAnalyzer"
 RequestExecutionLevel admin
 

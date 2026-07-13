@@ -2,6 +2,7 @@ from PySide6.QtCore import QThread, Signal
 
 from ..data import fetch_ohlcv, resolve_ticker, search_candidates
 from ..engine import analyze
+from ..updater import check_for_update
 
 
 class SearchWorker(QThread):
@@ -80,3 +81,16 @@ class WatchlistWorker(QThread):
                 self.item_done.emit(query, query, None, str(exc))
                 continue
             self.item_done.emit(symbol, name, result, "")
+
+
+class UpdateCheckWorker(QThread):
+    """Checks GitHub Releases for a newer version, off the UI thread."""
+
+    checked = Signal(object)  # UpdateInfo | None
+
+    def __init__(self, current_version: str, parent=None):
+        super().__init__(parent)
+        self.current_version = current_version
+
+    def run(self):
+        self.checked.emit(check_for_update(self.current_version))
