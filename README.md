@@ -72,6 +72,10 @@ python main.py
 # oppure, dopo l'installazione: stockanalyzer-gui
 ```
 
+La finestra si apre massimizzata, adattandosi alla risoluzione dello
+schermo. Il menu **Visualizza** permette di scegliere tra tema chiaro e
+tema scuro: la scelta viene ricordata tra un avvio e l'altro.
+
 La finestra è divisa in tre schede:
 
 - **Analisi** — Nel campo di ricerca puoi inserire un ticker (`AAPL`) oppure
@@ -93,10 +97,10 @@ La finestra è divisa in tre schede:
   popolando una tabella ordinabile con direzione/confidenza/conferme (le
   righe in errore restano visibili invece di interrompere il resto).
 
-Ticker, periodo, intervallo e watchlist vengono ricordati tra un avvio e
-l'altro. Il fetch dati e il calcolo girano sempre su un thread separato
-per non bloccare l'interfaccia. Il menu **Aiuto** contiene la guida
-all'uso e le informazioni sulla versione del programma.
+Ticker, periodo, intervallo, watchlist e tema vengono ricordati tra un
+avvio e l'altro. Il fetch dati e il calcolo girano sempre su un thread
+separato per non bloccare l'interfaccia. Il menu **Aiuto** contiene la
+guida all'uso e le informazioni sulla versione del programma.
 
 ## Versione e pacchetti di installazione
 

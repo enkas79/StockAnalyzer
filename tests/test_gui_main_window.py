@@ -4,9 +4,10 @@ import numpy as np
 import pandas as pd
 import pytest
 from PySide6.QtCore import QSettings
+from PySide6.QtWidgets import QApplication
 
 from stockanalyzer.engine import AnalysisResult, Leg
-from stockanalyzer.gui.main_window import MainWindow
+from stockanalyzer.gui.main_window import DARK_STYLESHEET, MainWindow
 
 SETTINGS_ORG = "StockAnalyzer"
 SETTINGS_APP = "StockAnalyzer"
@@ -178,3 +179,37 @@ def test_settings_persist_across_windows(qtbot):
     assert restored.period_combo.currentData() == "6mo"
     assert restored.interval_combo.currentData() == "60m"
     assert restored._watchlist_tickers() == ["AAPL", "MSFT"]
+
+
+def test_defaults_to_light_theme(qtbot):
+    window = MainWindow()
+    qtbot.addWidget(window)
+
+    assert window._theme == "light"
+    assert window.light_theme_action.isChecked()
+    assert not window.dark_theme_action.isChecked()
+
+
+def test_switching_to_dark_theme_updates_app_stylesheet_and_menu(qtbot):
+    window = MainWindow()
+    qtbot.addWidget(window)
+
+    window.dark_theme_action.trigger()
+
+    assert window._theme == "dark"
+    assert window.dark_theme_action.isChecked()
+    assert not window.light_theme_action.isChecked()
+    assert QApplication.instance().styleSheet() == DARK_STYLESHEET
+
+
+def test_theme_choice_persists_across_windows(qtbot):
+    window = MainWindow()
+    qtbot.addWidget(window)
+    window.dark_theme_action.trigger()
+    window._save_settings()
+
+    restored = MainWindow()
+    qtbot.addWidget(restored)
+
+    assert restored._theme == "dark"
+    assert restored.dark_theme_action.isChecked()

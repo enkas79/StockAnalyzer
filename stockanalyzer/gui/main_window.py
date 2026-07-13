@@ -3,7 +3,7 @@ import sys
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
 from PySide6.QtCore import QSettings, Qt, QTimer
-from PySide6.QtGui import QAction, QColor
+from PySide6.QtGui import QAction, QActionGroup, QColor
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -48,46 +48,48 @@ DIRECTION_COLORS = {
     "neutral": LEG_COLORS["neutral"],
 }
 
-APP_STYLESHEET = """
+LIGHT_STYLESHEET = """
 QMainWindow, QWidget {
-    background-color: #f4f5f7;
-    color: #1c1c1e;
+    background-color: #e9ebee;
+    color: #17181a;
     font-size: 13px;
 }
 QTabWidget::pane {
-    border: 1px solid #d5d8dc;
+    border: 1px solid #b7bbc2;
     border-radius: 8px;
     background: #ffffff;
     top: -1px;
 }
 QTabBar::tab {
-    background: #e6e8eb;
-    color: #4a4d52;
+    background: #d7dade;
+    color: #3a3d42;
     padding: 8px 18px;
+    border: 1px solid #b7bbc2;
+    border-bottom: none;
     border-top-left-radius: 8px;
     border-top-right-radius: 8px;
     margin-right: 2px;
 }
 QTabBar::tab:selected {
     background: #ffffff;
-    color: #1c1c1e;
-    font-weight: 600;
+    color: #101113;
+    font-weight: 700;
 }
-QTabBar::tab:hover { background: #f0f1f3; }
+QTabBar::tab:hover { background: #eef0f3; }
 QGroupBox {
     background: #ffffff;
-    border: 1px solid #dfe2e6;
+    border: 1px solid #c2c6cc;
     border-radius: 10px;
     margin-top: 16px;
     padding: 14px 10px 10px 10px;
-    font-weight: 600;
+    font-weight: 700;
 }
 QGroupBox::title {
     subcontrol-origin: margin;
     subcontrol-position: top left;
     left: 12px;
     padding: 0 6px;
-    color: #33363b;
+    color: #101113;
 }
 QPushButton {
     background-color: #2f6fed;
@@ -95,53 +97,183 @@ QPushButton {
     border: none;
     border-radius: 6px;
     padding: 7px 18px;
-    font-weight: 600;
+    font-weight: 700;
 }
 QPushButton:hover { background-color: #255ed1; }
 QPushButton:pressed { background-color: #1d4bab; }
-QPushButton:disabled { background-color: #b6c3e0; color: #eef1f8; }
+QPushButton:disabled { background-color: #aab8d6; color: #eef1f8; }
 QLineEdit, QComboBox, QDoubleSpinBox, QListWidget, QTableWidget {
     background: #ffffff;
-    border: 1px solid #d0d3d8;
+    border: 1px solid #b7bbc2;
     border-radius: 6px;
     padding: 4px 6px;
     selection-background-color: #2f6fed;
     selection-color: #ffffff;
 }
+QListWidget, QTableWidget {
+    alternate-background-color: #f0f2f5;
+}
 QTableWidget {
-    gridline-color: #e8eaed;
+    gridline-color: #d3d7dc;
 }
 QTableWidget::item, QListWidget::item {
-    padding: 3px;
+    padding: 4px;
 }
 QHeaderView::section {
-    background: #eef0f3;
-    color: #33363b;
+    background: #e0e3e8;
+    color: #101113;
     padding: 6px;
     border: none;
-    border-bottom: 1px solid #d0d3d8;
-    font-weight: 600;
+    border-bottom: 1px solid #b7bbc2;
+    font-weight: 700;
 }
 QProgressBar {
-    border: 1px solid #d0d3d8;
+    border: 1px solid #b7bbc2;
     border-radius: 6px;
     text-align: center;
-    background: #ffffff;
+    background-color: #ffffff;
     min-height: 20px;
+    color: #101113;
 }
 QProgressBar::chunk {
     background-color: #2f6fed;
     border-radius: 5px;
 }
 QStatusBar {
-    background: #eef0f3;
-    border-top: 1px solid #d5d8dc;
+    background: #e0e3e8;
+    border-top: 1px solid #b7bbc2;
 }
 QCheckBox { spacing: 6px; }
-QMenuBar {
-    background: #f4f5f7;
+QMenuBar { background: #e9ebee; }
+QMenuBar::item:selected { background: #d7dade; }
+QMenu {
+    background: #ffffff;
+    border: 1px solid #b7bbc2;
+}
+QMenu::item:selected {
+    background: #2f6fed;
+    color: #ffffff;
 }
 """
+
+DARK_STYLESHEET = """
+QMainWindow, QWidget {
+    background-color: #202124;
+    color: #e8e9eb;
+    font-size: 13px;
+}
+QTabWidget::pane {
+    border: 1px solid #3c3f44;
+    border-radius: 8px;
+    background: #26282c;
+    top: -1px;
+}
+QTabBar::tab {
+    background: #2c2e33;
+    color: #b7bbc2;
+    padding: 8px 18px;
+    border: 1px solid #3c3f44;
+    border-bottom: none;
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
+    margin-right: 2px;
+}
+QTabBar::tab:selected {
+    background: #26282c;
+    color: #f5f6f7;
+    font-weight: 700;
+}
+QTabBar::tab:hover { background: #34363c; }
+QGroupBox {
+    background: #26282c;
+    border: 1px solid #3c3f44;
+    border-radius: 10px;
+    margin-top: 16px;
+    padding: 14px 10px 10px 10px;
+    font-weight: 700;
+    color: #f5f6f7;
+}
+QGroupBox::title {
+    subcontrol-origin: margin;
+    subcontrol-position: top left;
+    left: 12px;
+    padding: 0 6px;
+    color: #f5f6f7;
+}
+QPushButton {
+    background-color: #4c86ff;
+    color: #0c0d0e;
+    border: none;
+    border-radius: 6px;
+    padding: 7px 18px;
+    font-weight: 700;
+}
+QPushButton:hover { background-color: #6b9bff; }
+QPushButton:pressed { background-color: #3a6fe0; }
+QPushButton:disabled { background-color: #3d4552; color: #7d8794; }
+QLineEdit, QComboBox, QDoubleSpinBox, QListWidget, QTableWidget {
+    background: #1b1c1f;
+    color: #e8e9eb;
+    border: 1px solid #3c3f44;
+    border-radius: 6px;
+    padding: 4px 6px;
+    selection-background-color: #4c86ff;
+    selection-color: #0c0d0e;
+}
+QListWidget, QTableWidget {
+    alternate-background-color: #232427;
+}
+QTableWidget {
+    gridline-color: #34363c;
+}
+QTableWidget::item, QListWidget::item {
+    padding: 4px;
+}
+QHeaderView::section {
+    background: #2c2e33;
+    color: #f5f6f7;
+    padding: 6px;
+    border: none;
+    border-bottom: 1px solid #3c3f44;
+    font-weight: 700;
+}
+QProgressBar {
+    border: 1px solid #3c3f44;
+    border-radius: 6px;
+    text-align: center;
+    background-color: #1b1c1f;
+    min-height: 20px;
+    color: #e8e9eb;
+}
+QProgressBar::chunk {
+    background-color: #4c86ff;
+    border-radius: 5px;
+}
+QStatusBar {
+    background: #2c2e33;
+    border-top: 1px solid #3c3f44;
+    color: #e8e9eb;
+}
+QCheckBox { spacing: 6px; }
+QMenuBar { background: #202124; color: #e8e9eb; }
+QMenuBar::item:selected { background: #34363c; }
+QMenu {
+    background: #26282c;
+    color: #e8e9eb;
+    border: 1px solid #3c3f44;
+}
+QMenu::item:selected {
+    background: #4c86ff;
+    color: #0c0d0e;
+}
+"""
+
+THEMES = {"light": LIGHT_STYLESHEET, "dark": DARK_STYLESHEET}
+MUTED_TEXT_COLOR = {"light": "#54585f", "dark": "#aeb4bd"}
+CHART_THEME = {
+    "light": {"bg": "#ffffff", "text": "#17181a", "grid": "#d3d7dc"},
+    "dark": {"bg": "#1b1c1f", "text": "#e8e9eb", "grid": "#34363c"},
+}
 
 GUIDE_TEXT = """\
 <b>1. Come cercare un titolo</b><br>
@@ -252,9 +384,12 @@ class MainWindow(QMainWindow):
         self._watchlist_worker: WatchlistWorker | None = None
         self._watchlist_done = 0
         self._watchlist_total = 0
+        self._theme = "light"
+        self._last_chart: tuple[str, object] | None = None  # (symbol, df) for theme redraws
         self._settings = QSettings("StockAnalyzer", "StockAnalyzer")
         self._build_menu()
         self._build_ui()
+        self._apply_theme(self._theme)
         self._load_settings()
 
     def _apply_screen_aware_minimum_size(self):
@@ -270,6 +405,21 @@ class MainWindow(QMainWindow):
         self.setMinimumSize(preferred_width, preferred_height)
 
     def _build_menu(self):
+        self.view_menu = self.menuBar().addMenu("&Visualizza")
+
+        self.theme_action_group = QActionGroup(self)
+        self.theme_action_group.setExclusive(True)
+
+        self.light_theme_action = QAction("Tema &chiaro", self, checkable=True)
+        self.light_theme_action.triggered.connect(lambda: self._apply_theme("light"))
+        self.theme_action_group.addAction(self.light_theme_action)
+        self.view_menu.addAction(self.light_theme_action)
+
+        self.dark_theme_action = QAction("Tema &scuro", self, checkable=True)
+        self.dark_theme_action.triggered.connect(lambda: self._apply_theme("dark"))
+        self.theme_action_group.addAction(self.dark_theme_action)
+        self.view_menu.addAction(self.dark_theme_action)
+
         self.help_menu = self.menuBar().addMenu("&Aiuto")
 
         self.guide_action = QAction("&Guida", self)
@@ -279,6 +429,25 @@ class MainWindow(QMainWindow):
         self.about_action = QAction("&Informazioni su StockAnalyzer", self)
         self.about_action.triggered.connect(self._show_about)
         self.help_menu.addAction(self.about_action)
+
+    def _apply_theme(self, theme: str):
+        theme = theme if theme in THEMES else "light"
+        self._theme = theme
+
+        app = QApplication.instance()
+        if app is not None:
+            app.setStyleSheet(THEMES[theme])
+
+        muted = MUTED_TEXT_COLOR[theme]
+        self.candles_label.setStyleSheet(f"color: {muted}; font-weight: normal;")
+        self.symbol_label.setStyleSheet(f"color: {muted}; font-weight: normal;")
+        self.watchlist_progress_label.setStyleSheet(f"color: {muted}; font-weight: normal;")
+
+        self.light_theme_action.setChecked(theme == "light")
+        self.dark_theme_action.setChecked(theme == "dark")
+
+        self._style_chart_axes()
+        self.chart_canvas.draw()
 
     def _show_guide(self):
         QMessageBox.information(self, "Guida", GUIDE_TEXT)
@@ -389,6 +558,7 @@ class MainWindow(QMainWindow):
         self.legs_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
         self.legs_table.verticalHeader().setVisible(False)
         self.legs_table.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.legs_table.setAlternatingRowColors(True)
         result_layout.addWidget(self.legs_table)
 
         layout.addWidget(result_group, stretch=1)
@@ -449,13 +619,34 @@ class MainWindow(QMainWindow):
         self._clear_chart()
         return central
 
+    def _style_chart_axes(self):
+        colors = CHART_THEME[self._theme]
+        self.chart_figure.set_facecolor(colors["bg"])
+        for ax in (self.chart_ax_price, self.chart_ax_rsi):
+            ax.set_facecolor(colors["bg"])
+            ax.tick_params(colors=colors["text"], labelcolor=colors["text"])
+            ax.title.set_color(colors["text"])
+            ax.xaxis.label.set_color(colors["text"])
+            ax.yaxis.label.set_color(colors["text"])
+            ax.grid(color=colors["grid"], alpha=0.5)
+            for spine in ax.spines.values():
+                spine.set_color(colors["grid"])
+            legend = ax.get_legend()
+            if legend is not None:
+                legend.get_frame().set_facecolor(colors["bg"])
+                legend.get_frame().set_edgecolor(colors["grid"])
+                for text in legend.get_texts():
+                    text.set_color(colors["text"])
+
     def _clear_chart(self):
         self.chart_ax_price.clear()
         self.chart_ax_rsi.clear()
         self.chart_ax_price.set_title("Analizza un ticker per vedere il grafico")
+        self._style_chart_axes()
         self.chart_canvas.draw()
 
     def _update_chart(self, symbol: str, df):
+        self._last_chart = (symbol, df)
         close = df["close"]
         ema50 = indicators.ema(close, 50)
         ema200 = indicators.ema(close, 200)
@@ -477,6 +668,7 @@ class MainWindow(QMainWindow):
         self.chart_ax_rsi.legend(loc="upper left", fontsize="small")
 
         self.chart_figure.autofmt_xdate()
+        self._style_chart_axes()
         self.chart_canvas.draw()
 
     def _build_watchlist_tab(self) -> QWidget:
@@ -523,6 +715,7 @@ class MainWindow(QMainWindow):
         self.watchlist_table.verticalHeader().setVisible(False)
         self.watchlist_table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.watchlist_table.setSortingEnabled(True)
+        self.watchlist_table.setAlternatingRowColors(True)
         layout.addWidget(self.watchlist_table)
 
         return central
@@ -555,6 +748,8 @@ class MainWindow(QMainWindow):
         self.candles_label.setText(f"≈ {bars} candele stimate (minimo richiesto: 200)")
 
     def _load_settings(self):
+        self._apply_theme(self._settings.value("theme", "light"))
+
         ticker = self._settings.value("ticker", "")
         if ticker:
             self.ticker_input.setText(ticker)
@@ -585,6 +780,7 @@ class MainWindow(QMainWindow):
         self._settings.setValue("period", self.period_combo.currentData())
         self._settings.setValue("interval", self.interval_combo.currentData())
         self._settings.setValue("watchlist", "|".join(self._watchlist_tickers()))
+        self._settings.setValue("theme", self._theme)
 
     def closeEvent(self, event):
         self._save_settings()
@@ -792,8 +988,7 @@ class MainWindow(QMainWindow):
 
 def main():
     app = QApplication(sys.argv)
-    app.setStyleSheet(APP_STYLESHEET)
-    window = MainWindow()
+    window = MainWindow()  # applies the saved (or default light) theme itself
     # Open maximized so the window fills whatever screen it lands on, rather
     # than a fixed pixel size that's oversized on small displays or tiny on
     # large/high-DPI ones; setMinimumSize still protects very small screens.
