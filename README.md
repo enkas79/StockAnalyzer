@@ -96,6 +96,8 @@ La finestra è divisa in tre schede:
   tutti" li scarica e valuta uno alla volta su un thread separato,
   popolando una tabella ordinabile con direzione/confidenza/conferme (le
   righe in errore restano visibili invece di interrompere il resto).
+  Doppio click su una riga (o "Carica selezionato") la apre nella scheda
+  Analisi e nel Grafico.
 
 Ticker, periodo, intervallo, watchlist e tema vengono ricordati tra un
 avvio e l'altro. Il fetch dati e il calcolo girano sempre su un thread

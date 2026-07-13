@@ -374,7 +374,8 @@ bloccare l'interfaccia, e popola una tabella ordinabile (clicca
 sull'intestazione di una colonna per ordinare) con direzione,
 confidenza e conferme. Un ticker che fallisce (es. non trovato) resta
 visibile in tabella con l'errore, senza interrompere l'analisi degli
-altri.<br><br>
+altri. Doppio click su una riga (o selezionala e premi "Carica
+selezionato") per aprirla nella scheda Analisi e nel Grafico.<br><br>
 
 <b>9. Backtest (da codice, non ancora in questa finestra)</b><br>
 Il modulo <i>stockanalyzer.backtest</i> fa scorrere il motore su una
@@ -533,6 +534,7 @@ class MainWindow(QMainWindow):
 
     def _build_ui(self):
         tabs = QTabWidget()
+        self.tabs = tabs
         self.setCentralWidget(tabs)
         tabs.addTab(self._build_analysis_tab(), "Analisi")
         tabs.addTab(self._build_chart_tab(), "Grafico")
@@ -792,6 +794,14 @@ class MainWindow(QMainWindow):
 
         layout.addWidget(manage_group)
 
+        table_hint_row = QHBoxLayout()
+        table_hint_row.addWidget(QLabel("Doppio click su una riga per caricarla in Analisi/Grafico."))
+        table_hint_row.addStretch(1)
+        self.watchlist_load_button = QPushButton("Carica selezionato")
+        self.watchlist_load_button.clicked.connect(self._on_watchlist_load_selected)
+        table_hint_row.addWidget(self.watchlist_load_button)
+        layout.addLayout(table_hint_row)
+
         self.watchlist_table = QTableWidget(0, 5)
         self.watchlist_table.setHorizontalHeaderLabels(
             ["Ticker", "Nome", "Direzione", "Confidenza", "Conferme"]
@@ -799,8 +809,10 @@ class MainWindow(QMainWindow):
         self.watchlist_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
         self.watchlist_table.verticalHeader().setVisible(False)
         self.watchlist_table.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.watchlist_table.setSelectionBehavior(QTableWidget.SelectRows)
         self.watchlist_table.setSortingEnabled(True)
         self.watchlist_table.setAlternatingRowColors(True)
+        self.watchlist_table.cellDoubleClicked.connect(self._on_watchlist_row_double_clicked)
         layout.addWidget(self.watchlist_table)
 
         return central
@@ -1070,6 +1082,37 @@ class MainWindow(QMainWindow):
         self.watchlist_run_button.setEnabled(True)
         self.watchlist_table.setSortingEnabled(True)
         self.watchlist_progress_label.setText(f"Completato: {self._watchlist_total} ticker analizzati.")
+
+    def _on_watchlist_row_double_clicked(self, row: int, _column: int):
+        self._load_watchlist_row_into_analysis(row)
+
+    def _on_watchlist_load_selected(self):
+        row = self.watchlist_table.currentRow()
+        if row < 0:
+            self.status_bar.showMessage("Seleziona una riga della watchlist da caricare.")
+            return
+        self._load_watchlist_row_into_analysis(row)
+
+    def _load_watchlist_row_into_analysis(self, row: int):
+        ticker_item = self.watchlist_table.item(row, 0)
+        name_item = self.watchlist_table.item(row, 1)
+        if ticker_item is None or name_item is None:
+            return
+        if name_item.text().startswith("Errore"):
+            self.status_bar.showMessage(
+                f"'{ticker_item.text()}' non è stato analizzato correttamente nella watchlist."
+            )
+            return
+
+        symbol = ticker_item.text()
+        name = name_item.text()
+
+        self._resolved = (symbol, name)
+        self.ticker_input.blockSignals(True)
+        self.ticker_input.setText(symbol)
+        self.ticker_input.blockSignals(False)
+        self.tabs.setCurrentIndex(0)  # Analisi tab, where the chart update also follows
+        self._on_analyze_clicked()
 
 
 def main():

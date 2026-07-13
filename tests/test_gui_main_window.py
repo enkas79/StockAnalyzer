@@ -263,3 +263,66 @@ def test_check_for_updates_runs_off_the_ui_thread_and_reports_back(qtbot):
         window._check_for_updates()
         with qtbot.waitSignal(window._update_worker.checked, timeout=5000):
             pass
+
+
+def test_double_clicking_watchlist_row_loads_it_into_analysis_and_chart(qtbot):
+    window = MainWindow()
+    qtbot.addWidget(window)
+    window.watchlist_tickers_list.addItems(["AAPL"])
+
+    df = _make_df()
+    result = _make_result()
+
+    with (
+        patch("stockanalyzer.gui.worker.resolve_ticker", return_value=("AAPL", "Apple Inc.")),
+        patch("stockanalyzer.gui.worker.fetch_ohlcv", return_value=df),
+        patch("stockanalyzer.gui.worker.analyze", return_value=result),
+    ):
+        window._on_watchlist_run()
+        qtbot.waitUntil(lambda: window.watchlist_table.rowCount() == 1, timeout=5000)
+
+        window._on_watchlist_row_double_clicked(0, 0)
+        qtbot.waitUntil(lambda: window.direction_label.text() == "BULLISH", timeout=5000)
+
+    assert window.tabs.currentIndex() == 0
+    assert window.ticker_input.text() == "AAPL"
+    assert len(window.chart_ax_price.get_lines()) == 3
+
+
+def test_load_selected_watchlist_row_button(qtbot):
+    window = MainWindow()
+    qtbot.addWidget(window)
+    window.watchlist_tickers_list.addItems(["MSFT"])
+
+    df = _make_df()
+    result = _make_result()
+
+    with (
+        patch("stockanalyzer.gui.worker.resolve_ticker", return_value=("MSFT", "Microsoft Corp.")),
+        patch("stockanalyzer.gui.worker.fetch_ohlcv", return_value=df),
+        patch("stockanalyzer.gui.worker.analyze", return_value=result),
+    ):
+        window._on_watchlist_run()
+        qtbot.waitUntil(lambda: window.watchlist_table.rowCount() == 1, timeout=5000)
+
+        window.watchlist_table.selectRow(0)
+        window._on_watchlist_load_selected()
+        qtbot.waitUntil(lambda: window.direction_label.text() == "BULLISH", timeout=5000)
+
+    assert window.tabs.currentIndex() == 0
+    assert window.ticker_input.text() == "MSFT"
+
+
+def test_loading_errored_watchlist_row_shows_status_message_without_switching_tabs(qtbot):
+    window = MainWindow()
+    qtbot.addWidget(window)
+    window.watchlist_tickers_list.addItems(["BADTICKER"])
+    window.tabs.setCurrentIndex(2)
+
+    with patch("stockanalyzer.gui.worker.resolve_ticker", side_effect=ValueError("boom")):
+        window._on_watchlist_run()
+        qtbot.waitUntil(lambda: window.watchlist_table.rowCount() == 1, timeout=5000)
+
+        window._on_watchlist_row_double_clicked(0, 0)
+
+    assert window.tabs.currentIndex() == 2  # unchanged, no valid result to load
