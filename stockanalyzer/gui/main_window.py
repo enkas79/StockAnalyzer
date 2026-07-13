@@ -8,6 +8,7 @@ from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
     QComboBox,
+    QGroupBox,
     QHBoxLayout,
     QHeaderView,
     QLabel,
@@ -40,6 +41,107 @@ LEG_COLORS = {
     "neutral": QColor("#757575"),
     "veto": QColor("#c62828"),
 }
+
+DIRECTION_COLORS = {
+    "bullish": LEG_COLORS["confirm"],
+    "bearish": LEG_COLORS["veto"],
+    "neutral": LEG_COLORS["neutral"],
+}
+
+APP_STYLESHEET = """
+QMainWindow, QWidget {
+    background-color: #f4f5f7;
+    color: #1c1c1e;
+    font-size: 13px;
+}
+QTabWidget::pane {
+    border: 1px solid #d5d8dc;
+    border-radius: 8px;
+    background: #ffffff;
+    top: -1px;
+}
+QTabBar::tab {
+    background: #e6e8eb;
+    color: #4a4d52;
+    padding: 8px 18px;
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
+    margin-right: 2px;
+}
+QTabBar::tab:selected {
+    background: #ffffff;
+    color: #1c1c1e;
+    font-weight: 600;
+}
+QTabBar::tab:hover { background: #f0f1f3; }
+QGroupBox {
+    background: #ffffff;
+    border: 1px solid #dfe2e6;
+    border-radius: 10px;
+    margin-top: 16px;
+    padding: 14px 10px 10px 10px;
+    font-weight: 600;
+}
+QGroupBox::title {
+    subcontrol-origin: margin;
+    subcontrol-position: top left;
+    left: 12px;
+    padding: 0 6px;
+    color: #33363b;
+}
+QPushButton {
+    background-color: #2f6fed;
+    color: #ffffff;
+    border: none;
+    border-radius: 6px;
+    padding: 7px 18px;
+    font-weight: 600;
+}
+QPushButton:hover { background-color: #255ed1; }
+QPushButton:pressed { background-color: #1d4bab; }
+QPushButton:disabled { background-color: #b6c3e0; color: #eef1f8; }
+QLineEdit, QComboBox, QDoubleSpinBox, QListWidget, QTableWidget {
+    background: #ffffff;
+    border: 1px solid #d0d3d8;
+    border-radius: 6px;
+    padding: 4px 6px;
+    selection-background-color: #2f6fed;
+    selection-color: #ffffff;
+}
+QTableWidget {
+    gridline-color: #e8eaed;
+}
+QTableWidget::item, QListWidget::item {
+    padding: 3px;
+}
+QHeaderView::section {
+    background: #eef0f3;
+    color: #33363b;
+    padding: 6px;
+    border: none;
+    border-bottom: 1px solid #d0d3d8;
+    font-weight: 600;
+}
+QProgressBar {
+    border: 1px solid #d0d3d8;
+    border-radius: 6px;
+    text-align: center;
+    background: #ffffff;
+    min-height: 20px;
+}
+QProgressBar::chunk {
+    background-color: #2f6fed;
+    border-radius: 5px;
+}
+QStatusBar {
+    background: #eef0f3;
+    border-top: 1px solid #d5d8dc;
+}
+QCheckBox { spacing: 6px; }
+QMenuBar {
+    background: #f4f5f7;
+}
+"""
 
 GUIDE_TEXT = """\
 <b>Come cercare</b><br>
@@ -79,7 +181,7 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("StockAnalyzer")
-        self.resize(720, 520)
+        self._apply_screen_aware_minimum_size()
         self._worker: AnalysisWorker | None = None
         self._search_worker: SearchWorker | None = None
         self._search_timer = QTimer(self)
@@ -94,6 +196,18 @@ class MainWindow(QMainWindow):
         self._build_menu()
         self._build_ui()
         self._load_settings()
+
+    def _apply_screen_aware_minimum_size(self):
+        """A fixed minimum size can exceed a small screen's own resolution,
+        which would stop showMaximized() from actually filling it. Cap the
+        floor to whatever the screen the window opens on can offer."""
+        preferred_width, preferred_height = 900, 600
+        screen = QApplication.primaryScreen()
+        if screen is not None:
+            available = screen.availableGeometry()
+            preferred_width = min(preferred_width, available.width())
+            preferred_height = min(preferred_height, available.height())
+        self.setMinimumSize(preferred_width, preferred_height)
 
     def _build_menu(self):
         self.help_menu = self.menuBar().addMenu("&Aiuto")
@@ -131,6 +245,10 @@ class MainWindow(QMainWindow):
     def _build_analysis_tab(self) -> QWidget:
         central = QWidget()
         layout = QVBoxLayout(central)
+        layout.setSpacing(14)
+
+        search_group = QGroupBox("Ricerca e parametri")
+        search_layout = QVBoxLayout(search_group)
 
         form_row = QHBoxLayout()
         self.ticker_input = QLineEdit()
@@ -153,23 +271,23 @@ class MainWindow(QMainWindow):
         self.analyze_button.clicked.connect(self._on_analyze_clicked)
 
         form_row.addWidget(QLabel("Ticker:"))
-        form_row.addWidget(self.ticker_input)
+        form_row.addWidget(self.ticker_input, stretch=1)
         form_row.addWidget(QLabel("Periodo:"))
         form_row.addWidget(self.period_combo)
         form_row.addWidget(QLabel("Intervallo:"))
         form_row.addWidget(self.interval_combo)
         form_row.addWidget(self.analyze_button)
-        layout.addLayout(form_row)
+        search_layout.addLayout(form_row)
 
         self.results_list = QListWidget()
         self.results_list.setMaximumHeight(120)
         self.results_list.itemClicked.connect(self._on_candidate_selected)
         self.results_list.hide()
-        layout.addWidget(self.results_list)
+        search_layout.addWidget(self.results_list)
 
         self.candles_label = QLabel("")
         self.candles_label.setStyleSheet("color: #757575;")
-        layout.addWidget(self.candles_label)
+        search_layout.addWidget(self.candles_label)
 
         extra_legs_row = QHBoxLayout()
         extra_legs_row.addWidget(QLabel("Leg opzionali:"))
@@ -178,26 +296,31 @@ class MainWindow(QMainWindow):
         extra_legs_row.addWidget(self.macd_checkbox)
         extra_legs_row.addWidget(self.bollinger_checkbox)
         extra_legs_row.addStretch(1)
-        layout.addLayout(extra_legs_row)
+        search_layout.addLayout(extra_legs_row)
 
+        layout.addWidget(search_group)
         self._on_period_changed()
 
+        result_group = QGroupBox("Risultato")
+        result_layout = QVBoxLayout(result_group)
+
         self.symbol_label = QLabel("")
-        self.symbol_label.setStyleSheet("color: #757575;")
-        layout.addWidget(self.symbol_label)
+        self.symbol_label.setStyleSheet("color: #757575; font-weight: normal;")
+        result_layout.addWidget(self.symbol_label)
 
         self.direction_label = QLabel("-")
-        self.direction_label.setStyleSheet("font-size: 22px; font-weight: bold;")
-        layout.addWidget(self.direction_label)
+        self.direction_label.setStyleSheet("font-size: 26px; font-weight: bold;")
+        result_layout.addWidget(self.direction_label)
 
         score_row = QHBoxLayout()
         self.score_bar = QProgressBar()
         self.score_bar.setRange(0, 100)
         self.score_bar.setFormat("Confidenza: %v/100")
         self.confirmations_label = QLabel("Conferme: -")
+        self.confirmations_label.setStyleSheet("font-weight: normal;")
         score_row.addWidget(self.score_bar, stretch=1)
         score_row.addWidget(self.confirmations_label)
-        layout.addLayout(score_row)
+        result_layout.addLayout(score_row)
 
         self.legs_table = QTableWidget(0, 3)
         self.legs_table.setHorizontalHeaderLabels(["Leg", "Stato", "Dettaglio"])
@@ -206,16 +329,23 @@ class MainWindow(QMainWindow):
         self.legs_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
         self.legs_table.verticalHeader().setVisible(False)
         self.legs_table.setEditTriggers(QTableWidget.NoEditTriggers)
-        layout.addWidget(self.legs_table)
+        result_layout.addWidget(self.legs_table)
+
+        layout.addWidget(result_group, stretch=1)
+
+        risk_group = QGroupBox("Rischio e position sizing")
+        risk_layout = QVBoxLayout(risk_group)
 
         risk_row = QHBoxLayout()
         self.price_label = QLabel("Prezzo: -")
         self.atr_label = QLabel("ATR: -")
         self.stop_label = QLabel("Stop suggerito: -")
+        for label in (self.price_label, self.atr_label, self.stop_label):
+            label.setStyleSheet("font-weight: normal;")
         risk_row.addWidget(self.price_label)
         risk_row.addWidget(self.atr_label)
         risk_row.addWidget(self.stop_label)
-        layout.addLayout(risk_row)
+        risk_layout.addLayout(risk_row)
 
         sizing_row = QHBoxLayout()
         self.account_size_input = QDoubleSpinBox()
@@ -232,13 +362,16 @@ class MainWindow(QMainWindow):
         self.risk_pct_input.valueChanged.connect(self._update_position_size)
 
         self.position_size_label = QLabel("Size suggerita: -")
+        self.position_size_label.setStyleSheet("font-weight: normal;")
 
         sizing_row.addWidget(QLabel("Capitale:"))
         sizing_row.addWidget(self.account_size_input)
         sizing_row.addWidget(QLabel("Rischio per trade:"))
         sizing_row.addWidget(self.risk_pct_input)
         sizing_row.addWidget(self.position_size_label, stretch=1)
-        layout.addLayout(sizing_row)
+        risk_layout.addLayout(sizing_row)
+
+        layout.addWidget(risk_group)
 
         return central
 
@@ -289,6 +422,10 @@ class MainWindow(QMainWindow):
     def _build_watchlist_tab(self) -> QWidget:
         central = QWidget()
         layout = QVBoxLayout(central)
+        layout.setSpacing(14)
+
+        manage_group = QGroupBox("Gestisci watchlist")
+        manage_layout = QVBoxLayout(manage_group)
 
         add_row = QHBoxLayout()
         self.watchlist_input = QLineEdit()
@@ -299,22 +436,24 @@ class MainWindow(QMainWindow):
         self.watchlist_remove_button = QPushButton("Rimuovi selezionato")
         self.watchlist_remove_button.clicked.connect(self._on_watchlist_remove)
         add_row.addWidget(QLabel("Ticker:"))
-        add_row.addWidget(self.watchlist_input)
+        add_row.addWidget(self.watchlist_input, stretch=1)
         add_row.addWidget(self.watchlist_add_button)
         add_row.addWidget(self.watchlist_remove_button)
-        layout.addLayout(add_row)
+        manage_layout.addLayout(add_row)
 
         self.watchlist_tickers_list = QListWidget()
         self.watchlist_tickers_list.setMaximumHeight(100)
-        layout.addWidget(self.watchlist_tickers_list)
+        manage_layout.addWidget(self.watchlist_tickers_list)
 
         self.watchlist_run_button = QPushButton("Analizza tutti")
+        manage_layout.addWidget(self.watchlist_run_button)
         self.watchlist_run_button.clicked.connect(self._on_watchlist_run)
-        layout.addWidget(self.watchlist_run_button)
 
         self.watchlist_progress_label = QLabel("")
-        self.watchlist_progress_label.setStyleSheet("color: #757575;")
-        layout.addWidget(self.watchlist_progress_label)
+        self.watchlist_progress_label.setStyleSheet("color: #757575; font-weight: normal;")
+        manage_layout.addWidget(self.watchlist_progress_label)
+
+        layout.addWidget(manage_group)
 
         self.watchlist_table = QTableWidget(0, 5)
         self.watchlist_table.setHorizontalHeaderLabels(
@@ -466,6 +605,8 @@ class MainWindow(QMainWindow):
 
         self.symbol_label.setText(f"{symbol} — {name}" if name != symbol else symbol)
         self.direction_label.setText(result.direction.upper())
+        direction_color = DIRECTION_COLORS.get(result.direction, QColor("black")).name()
+        self.direction_label.setStyleSheet(f"font-size: 26px; font-weight: bold; color: {direction_color};")
         self.score_bar.setValue(int(result.score))
         self.confirmations_label.setText(f"Conferme: {result.confirmations}/{result.total_legs}")
 
@@ -591,8 +732,12 @@ class MainWindow(QMainWindow):
 
 def main():
     app = QApplication(sys.argv)
+    app.setStyleSheet(APP_STYLESHEET)
     window = MainWindow()
-    window.show()
+    # Open maximized so the window fills whatever screen it lands on, rather
+    # than a fixed pixel size that's oversized on small displays or tiny on
+    # large/high-DPI ones; setMinimumSize still protects very small screens.
+    window.showMaximized()
     sys.exit(app.exec())
 
 
