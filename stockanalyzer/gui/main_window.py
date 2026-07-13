@@ -53,21 +53,21 @@ DIRECTION_COLORS = {
 
 LIGHT_STYLESHEET = """
 QMainWindow, QWidget {
-    background-color: #e9ebee;
-    color: #17181a;
+    background-color: #eef0f2;
+    color: #24262a;
     font-size: 13px;
 }
 QTabWidget::pane {
-    border: 1px solid #b7bbc2;
+    border: 1px solid #d6d9dd;
     border-radius: 8px;
     background: #ffffff;
     top: -1px;
 }
 QTabBar::tab {
-    background: #d7dade;
-    color: #3a3d42;
+    background: #e2e4e7;
+    color: #45484d;
     padding: 8px 18px;
-    border: 1px solid #b7bbc2;
+    border: 1px solid #d6d9dd;
     border-bottom: none;
     border-top-left-radius: 8px;
     border-top-right-radius: 8px;
@@ -76,16 +76,15 @@ QTabBar::tab {
 QTabBar::tab:selected {
     background: #ffffff;
     color: #101113;
-    font-weight: 700;
+    font-weight: 600;
 }
 QTabBar::tab:hover { background: #eef0f3; }
 QGroupBox {
     background: #ffffff;
-    border: 1px solid #c2c6cc;
+    border: 1px solid #d6d9dd;
     border-radius: 10px;
     margin-top: 16px;
     padding: 14px 10px 10px 10px;
-    font-weight: 700;
 }
 QGroupBox::title {
     subcontrol-origin: margin;
@@ -93,6 +92,7 @@ QGroupBox::title {
     left: 12px;
     padding: 0 6px;
     color: #101113;
+    font-weight: 600;
 }
 QPushButton {
     background-color: #2f6fed;
@@ -100,38 +100,38 @@ QPushButton {
     border: none;
     border-radius: 6px;
     padding: 7px 18px;
-    font-weight: 700;
+    font-weight: 600;
 }
 QPushButton:hover { background-color: #255ed1; }
 QPushButton:pressed { background-color: #1d4bab; }
 QPushButton:disabled { background-color: #aab8d6; color: #eef1f8; }
 QLineEdit, QComboBox, QDoubleSpinBox, QListWidget, QTableWidget {
     background: #ffffff;
-    border: 1px solid #b7bbc2;
+    border: 1px solid #d6d9dd;
     border-radius: 6px;
     padding: 4px 6px;
     selection-background-color: #2f6fed;
     selection-color: #ffffff;
 }
 QListWidget, QTableWidget {
-    alternate-background-color: #f0f2f5;
+    alternate-background-color: #f4f5f7;
 }
 QTableWidget {
-    gridline-color: #d3d7dc;
+    gridline-color: #e3e5e8;
 }
 QTableWidget::item, QListWidget::item {
     padding: 4px;
 }
 QHeaderView::section {
-    background: #e0e3e8;
-    color: #101113;
+    background: #f2f3f5;
+    color: #33363b;
     padding: 6px;
     border: none;
-    border-bottom: 1px solid #b7bbc2;
-    font-weight: 700;
+    border-bottom: 1px solid #d6d9dd;
+    font-weight: 600;
 }
 QProgressBar {
-    border: 1px solid #b7bbc2;
+    border: 1px solid #d6d9dd;
     border-radius: 6px;
     text-align: center;
     background-color: #ffffff;
@@ -143,15 +143,15 @@ QProgressBar::chunk {
     border-radius: 5px;
 }
 QStatusBar {
-    background: #e0e3e8;
-    border-top: 1px solid #b7bbc2;
+    background: #f2f3f5;
+    border-top: 1px solid #d6d9dd;
 }
 QCheckBox { spacing: 6px; }
-QMenuBar { background: #e9ebee; }
-QMenuBar::item:selected { background: #d7dade; }
+QMenuBar { background: #eef0f2; }
+QMenuBar::item:selected { background: #e2e4e7; }
 QMenu {
     background: #ffffff;
-    border: 1px solid #b7bbc2;
+    border: 1px solid #d6d9dd;
 }
 QMenu::item:selected {
     background: #2f6fed;
@@ -161,21 +161,21 @@ QMenu::item:selected {
 
 DARK_STYLESHEET = """
 QMainWindow, QWidget {
-    background-color: #202124;
-    color: #e8e9eb;
+    background-color: #1e1f22;
+    color: #dfe1e4;
     font-size: 13px;
 }
 QTabWidget::pane {
-    border: 1px solid #3c3f44;
+    border: 1px solid #35373c;
     border-radius: 8px;
     background: #26282c;
     top: -1px;
 }
 QTabBar::tab {
-    background: #2c2e33;
-    color: #b7bbc2;
+    background: #2a2c30;
+    color: #a9adb3;
     padding: 8px 18px;
-    border: 1px solid #3c3f44;
+    border: 1px solid #35373c;
     border-bottom: none;
     border-top-left-radius: 8px;
     border-top-right-radius: 8px;
@@ -183,25 +183,25 @@ QTabBar::tab {
 }
 QTabBar::tab:selected {
     background: #26282c;
-    color: #f5f6f7;
-    font-weight: 700;
+    color: #f0f1f2;
+    font-weight: 600;
 }
-QTabBar::tab:hover { background: #34363c; }
+QTabBar::tab:hover { background: #303236; }
 QGroupBox {
     background: #26282c;
-    border: 1px solid #3c3f44;
+    border: 1px solid #35373c;
     border-radius: 10px;
     margin-top: 16px;
     padding: 14px 10px 10px 10px;
-    font-weight: 700;
-    color: #f5f6f7;
+    color: #dfe1e4;
 }
 QGroupBox::title {
     subcontrol-origin: margin;
     subcontrol-position: top left;
     left: 12px;
     padding: 0 6px;
-    color: #f5f6f7;
+    color: #f0f1f2;
+    font-weight: 600;
 }
 QPushButton {
     background-color: #4c86ff;
@@ -209,61 +209,61 @@ QPushButton {
     border: none;
     border-radius: 6px;
     padding: 7px 18px;
-    font-weight: 700;
+    font-weight: 600;
 }
 QPushButton:hover { background-color: #6b9bff; }
 QPushButton:pressed { background-color: #3a6fe0; }
 QPushButton:disabled { background-color: #3d4552; color: #7d8794; }
 QLineEdit, QComboBox, QDoubleSpinBox, QListWidget, QTableWidget {
-    background: #1b1c1f;
-    color: #e8e9eb;
-    border: 1px solid #3c3f44;
+    background: #1e1f22;
+    color: #dfe1e4;
+    border: 1px solid #35373c;
     border-radius: 6px;
     padding: 4px 6px;
     selection-background-color: #4c86ff;
     selection-color: #0c0d0e;
 }
 QListWidget, QTableWidget {
-    alternate-background-color: #232427;
+    alternate-background-color: #28292d;
 }
 QTableWidget {
-    gridline-color: #34363c;
+    gridline-color: #303236;
 }
 QTableWidget::item, QListWidget::item {
     padding: 4px;
 }
 QHeaderView::section {
-    background: #2c2e33;
-    color: #f5f6f7;
+    background: #2a2c30;
+    color: #dfe1e4;
     padding: 6px;
     border: none;
-    border-bottom: 1px solid #3c3f44;
-    font-weight: 700;
+    border-bottom: 1px solid #35373c;
+    font-weight: 600;
 }
 QProgressBar {
-    border: 1px solid #3c3f44;
+    border: 1px solid #35373c;
     border-radius: 6px;
     text-align: center;
-    background-color: #1b1c1f;
+    background-color: #1e1f22;
     min-height: 20px;
-    color: #e8e9eb;
+    color: #dfe1e4;
 }
 QProgressBar::chunk {
     background-color: #4c86ff;
     border-radius: 5px;
 }
 QStatusBar {
-    background: #2c2e33;
-    border-top: 1px solid #3c3f44;
-    color: #e8e9eb;
+    background: #2a2c30;
+    border-top: 1px solid #35373c;
+    color: #dfe1e4;
 }
 QCheckBox { spacing: 6px; }
-QMenuBar { background: #202124; color: #e8e9eb; }
-QMenuBar::item:selected { background: #34363c; }
+QMenuBar { background: #1e1f22; color: #dfe1e4; }
+QMenuBar::item:selected { background: #303236; }
 QMenu {
     background: #26282c;
-    color: #e8e9eb;
-    border: 1px solid #3c3f44;
+    color: #dfe1e4;
+    border: 1px solid #35373c;
 }
 QMenu::item:selected {
     background: #4c86ff;
@@ -630,8 +630,9 @@ class MainWindow(QMainWindow):
         self.legs_table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.legs_table.setAlternatingRowColors(True)
         result_layout.addWidget(self.legs_table)
+        self._fit_legs_table_height()
 
-        layout.addWidget(result_group, stretch=1)
+        layout.addWidget(result_group)
 
         risk_group = QGroupBox("Rischio e position sizing")
         risk_layout = QVBoxLayout(risk_group)
@@ -672,8 +673,22 @@ class MainWindow(QMainWindow):
         risk_layout.addLayout(sizing_row)
 
         layout.addWidget(risk_group)
+        layout.addStretch(1)  # leftover space collects here, not stretched into a group
 
         return central
+
+    def _fit_legs_table_height(self):
+        """Size legs_table to its (small, bounded 3-5) row count instead of
+        letting it stretch to fill the tab, which left a large empty gap
+        below the last row on tall/maximized windows."""
+        self.legs_table.resizeRowsToContents()
+        row_count = max(self.legs_table.rowCount(), 3)
+        row_height = self.legs_table.rowHeight(0) if self.legs_table.rowCount() else 30
+        header_height = self.legs_table.horizontalHeader().height()
+        frame = 2 * self.legs_table.frameWidth()
+        # setMaximumHeight alone isn't enough: the layout still allocates the
+        # table its (smaller, generic) sizeHint unless the height is fixed.
+        self.legs_table.setFixedHeight(header_height + row_count * (row_height + 1) + frame + 10)
 
     def _build_chart_tab(self) -> QWidget:
         central = QWidget()
@@ -947,6 +962,7 @@ class MainWindow(QMainWindow):
             for col, item in enumerate(items):
                 item.setForeground(color)
                 self.legs_table.setItem(row, col, item)
+        self._fit_legs_table_height()
 
         self.price_label.setText(f"Prezzo: {result.price:.2f}")
         self.atr_label.setText(f"ATR: {result.atr:.2f}")
