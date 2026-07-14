@@ -29,7 +29,10 @@ jobs:
         with:
           python-version: "3.11"
       - run: pip install -e . pyinstaller
-      - run: pyinstaller --noconfirm --onefile --windowed --name StockAnalyzer --copy-metadata stockanalyzer --add-data "version.txt;." main.py
+      # onedir (the default, no --onefile): a proper installed app folder
+      # under Program Files, not a self-extracting single-file exe. NSIS
+      # packages the whole dist\StockAnalyzer\ folder into the installer.
+      - run: pyinstaller --noconfirm --windowed --name StockAnalyzer --copy-metadata stockanalyzer --add-data "version.txt;." main.py
       - name: Install NSIS
         run: |
           choco install nsis -y

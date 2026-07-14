@@ -1,5 +1,6 @@
 ; NSIS installer script for StockAnalyzer.
-; Built by CI against the PyInstaller onefile output at dist\StockAnalyzer.exe.
+; Built by CI against the PyInstaller onedir output at dist\StockAnalyzer\
+; (a proper installed-app folder, not a self-extracting onefile exe).
 ; Version comes from the command line: makensis /DVERSION=1.2.3 installer.nsi
 
 !ifndef VERSION
@@ -24,7 +25,7 @@ UninstPage instfiles
 
 Section "Install"
     SetOutPath "$INSTDIR"
-    File "..\..\dist\StockAnalyzer.exe"
+    File /r "..\..\dist\StockAnalyzer\*.*"
     CreateDirectory "$SMPROGRAMS\StockAnalyzer"
     CreateShortcut "$SMPROGRAMS\StockAnalyzer\StockAnalyzer.lnk" "$INSTDIR\StockAnalyzer.exe"
     CreateShortcut "$DESKTOP\StockAnalyzer.lnk" "$INSTDIR\StockAnalyzer.exe"
@@ -32,9 +33,7 @@ Section "Install"
 SectionEnd
 
 Section "Uninstall"
-    Delete "$INSTDIR\StockAnalyzer.exe"
-    Delete "$INSTDIR\Uninstall.exe"
-    RMDir "$INSTDIR"
+    RMDir /r "$INSTDIR"
     Delete "$SMPROGRAMS\StockAnalyzer\StockAnalyzer.lnk"
     RMDir "$SMPROGRAMS\StockAnalyzer"
     Delete "$DESKTOP\StockAnalyzer.lnk"
