@@ -258,11 +258,15 @@ def test_check_for_updates_runs_off_the_ui_thread_and_reports_back(qtbot):
 
     with (
         patch("stockanalyzer.gui.worker.check_for_update", return_value=info),
-        patch.object(QMessageBox, "exec", return_value=QMessageBox.StandardButton.Ok),
+        patch.object(QMessageBox, "exec", return_value=QMessageBox.StandardButton.Ok) as mock_exec,
     ):
         window._check_for_updates()
-        with qtbot.waitSignal(window._update_worker.checked, timeout=5000):
-            pass
+        # isFinished() only means the worker thread's run() returned; the
+        # checked signal it emits is delivered to _on_update_checked via a
+        # queued cross-thread connection, so wait for that slot's own
+        # observable effect instead of the thread state, or the still-queued
+        # (and by then unpatched) QMessageBox.exec() fires during a later test.
+        qtbot.waitUntil(lambda: mock_exec.called, timeout=5000)
 
 
 def test_double_clicking_watchlist_row_loads_it_into_analysis_and_chart(qtbot):
